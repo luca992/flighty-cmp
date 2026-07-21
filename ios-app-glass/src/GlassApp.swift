@@ -8,6 +8,12 @@ import KotlinModules
 // automatically. Detail navigation happens inside the Compose sheet (the map
 // updates behind it), matching the reference demo.
 
+// The Compose canvas is a Metal layer that can blank momentarily while UIKit
+// animates the hosting controller (e.g. the sheet presentation's card-stack
+// scale-down). Match the app's space background so those moments read as the
+// backdrop instead of a white flash.
+private let spaceBackground = UIColor(red: 0.016, green: 0.024, blue: 0.047, alpha: 1)
+
 // Invisible native button parked over the Compose avatar: tapping it presents
 // the system account menu. The anchor streams the avatar's frame from Kotlin.
 enum ProfileMenu {
@@ -56,6 +62,7 @@ struct FlightsTabView: UIViewControllerRepresentable {
         // bounds, this interaction hit-tests them and previews the row.
         vc.view.addInteraction(UIContextMenuInteraction(delegate: context.coordinator))
         ProfileMenu.attach(to: vc, anchor: anchor)
+        vc.view.backgroundColor = spaceBackground
         return vc
     }
     func updateUIViewController(_ vc: UIViewController, context: Context) {}
@@ -253,6 +260,7 @@ struct FriendsTabView: UIViewControllerRepresentable {
         let anchor = ProfileMenuAnchor()
         let vc = GlassControllersKt.FriendsTabController(profileAnchor: anchor)
         ProfileMenu.attach(to: vc, anchor: anchor)
+        vc.view.backgroundColor = spaceBackground
         return vc
     }
     func updateUIViewController(_ vc: UIViewController, context: Context) {}
@@ -263,6 +271,7 @@ struct PassportTabView: UIViewControllerRepresentable {
         let anchor = ProfileMenuAnchor()
         let vc = GlassControllersKt.PassportTabController(profileAnchor: anchor)
         ProfileMenu.attach(to: vc, anchor: anchor)
+        vc.view.backgroundColor = spaceBackground
         return vc
     }
     func updateUIViewController(_ vc: UIViewController, context: Context) {}
@@ -271,7 +280,13 @@ struct PassportTabView: UIViewControllerRepresentable {
 struct AddFlightView: UIViewControllerRepresentable {
     let onDismiss: () -> Void
     func makeUIViewController(context: Context) -> UIViewController {
-        GlassControllersKt.AddFlightController(onDismiss: onDismiss)
+        let vc = GlassControllersKt.AddFlightController(onDismiss: onDismiss)
+        // Match the Flighty sheet color before Compose paints its first
+        // frame, so presenting doesn't flash white.
+        vc.view.backgroundColor = UIColor(
+            red: 0.949, green: 0.949, blue: 0.961, alpha: 1
+        )
+        return vc
     }
     func updateUIViewController(_ vc: UIViewController, context: Context) {}
 }
@@ -335,6 +350,7 @@ struct GlassContentView: View {
                 .ignoresSafeArea()
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+                .presentationBackground(Color(red: 0.949, green: 0.949, blue: 0.961))
         }
     }
 }
