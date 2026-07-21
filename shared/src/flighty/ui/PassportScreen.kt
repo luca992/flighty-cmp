@@ -137,7 +137,7 @@ fun PassportScreen(
 
         Spacer(Modifier.height(10.dp))
         Row(
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
@@ -146,19 +146,19 @@ fun PassportScreen(
                 )
                 .padding(16.dp),
         ) {
-            Text(
-                text = "${stats.monthFlights}",
-                fontSize = 40.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-            )
-            Spacer(Modifier.size(12.dp))
-            Text(
-                text = stats.monthLabel,
-                fontSize = 14.sp,
-                color = Color.White.copy(alpha = 0.85f),
-                modifier = Modifier.weight(1f),
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "${stats.monthFlights}",
+                    fontSize = 44.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                )
+                Text(
+                    text = stats.monthLabel,
+                    fontSize = 13.sp,
+                    color = Color.White.copy(alpha = 0.85f),
+                )
+            }
             Icon(
                 imageVector = AppIcons.Share,
                 contentDescription = null,

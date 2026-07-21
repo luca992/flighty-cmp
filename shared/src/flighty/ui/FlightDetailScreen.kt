@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -245,38 +246,44 @@ private fun WheresMyPlaneCard(flight: Flight, note: String) {
     Surface(color = FlightyColors.CardBg, shape = RoundedCornerShape(18.dp)) {
         Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
             Text(
-                text = "WHERE'S MY PLANE?",
-                fontSize = 11.sp,
-                letterSpacing = 1.2.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = FlightyColors.TextGray,
+                text = "Where's My Plane?",
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                color = FlightyColors.Blue,
             )
+            Text(
+                text = flight.aircraft + (flight.aircraftInfo?.let { " · ${it.substringBefore(" ·")}" } ?: ""),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = FlightyColors.Blue.copy(alpha = 0.75f),
+            )
+            flight.aircraftInfo?.let {
+                Text(
+                    text = it.substringAfter("· ", it),
+                    fontSize = 11.sp,
+                    color = FlightyColors.TextGray,
+                )
+            }
             Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .background(FlightyColors.ChipBg, RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = AppIcons.Plane,
-                        contentDescription = null,
-                        tint = FlightyColors.Blue,
-                        modifier = Modifier.size(24.dp).rotate(90f),
-                    )
-                }
-                Column(modifier = Modifier.padding(start = 12.dp)) {
-                    Text(
-                        text = flight.aircraft,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = FlightyColors.TextDark,
-                    )
-                    flight.aircraftInfo?.let {
-                        Text(text = it, fontSize = 11.sp, color = FlightyColors.TextGray)
-                    }
-                }
+            // Sky banner standing in for the aircraft photo the real app shows.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(110.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color(0xFF7DB4E8), Color(0xFFB8D7F2), Color(0xFFE4F0FA)),
+                        ),
+                        RoundedCornerShape(12.dp),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = AppIcons.Plane,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(64.dp).rotate(90f),
+                )
             }
             Spacer(Modifier.height(10.dp))
             Text(
@@ -448,6 +455,20 @@ private fun EndpointBlock(
     terminalLine: String,
 ) {
     Row(verticalAlignment = Alignment.Top) {
+        Box(
+            modifier = Modifier
+                .padding(top = 1.dp, end = 8.dp)
+                .size(20.dp)
+                .background(FlightyColors.ChipBg, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = if (departure) "↗" else "↘",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = FlightyColors.TextDark,
+            )
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "$airportLine ›",

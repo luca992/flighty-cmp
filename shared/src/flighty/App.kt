@@ -296,12 +296,29 @@ private fun AddFlightSheet(
         contentWindowInsets = { WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom) },
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp)) {
-            Text(
-                text = "Add Flight",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = FlightyColors.TextDark,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Add Flight",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = FlightyColors.TextDark,
+                    modifier = Modifier.weight(1f),
+                )
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .background(FlightyColors.ChipBg, CircleShape)
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = AppIcons.Close,
+                        contentDescription = "Close",
+                        tint = FlightyColors.TextDark,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
             Text(
                 text = "Enter airline, airport, or flight",
                 fontSize = 13.sp,
