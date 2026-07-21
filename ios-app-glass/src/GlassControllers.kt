@@ -1,12 +1,9 @@
 import androidx.compose.foundation.LocalOverscrollFactory
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -17,7 +14,7 @@ import flighty.App
 import flighty.FlightsFlow
 import flighty.data.AppGraph
 import flighty.model.Flight
-import flighty.ui.AddFlightContent
+import flighty.ui.AddFlightSheetHost
 import flighty.ui.FlightyColors
 import flighty.ui.FlightyShell
 import flighty.ui.FlightyTheme
@@ -27,7 +24,6 @@ import flighty.ui.components.LocalNativeFlightMenuHost
 import flighty.ui.components.LocalNativeProfileMenuHost
 import flighty.ui.components.NativeFlightMenuHost
 import flighty.ui.components.NativeProfileMenuHost
-import flighty.vm.AddFlightViewModel
 import flighty.vm.FriendsViewModel
 import flighty.vm.PassportViewModel
 import platform.UIKit.UIViewController
@@ -40,12 +36,39 @@ import platform.UIKit.UIViewController
  * same shared Compose code the full-Compose apps use.
  * Pattern per https://kotlinlang.org/docs/multiplatform/ios-liquid-glass.html
  */
+/**
+ * The Add Flight sheet is presented INSIDE the Compose canvas (an M3 modal
+ * sheet), not as a UIKit modal: on the current CMP beta a UIKit presentation
+ * over a Compose canvas either snapshots the Metal layer blank (.sheet) or
+ * permanently suspends its rendering (fullScreenCover). Swift triggers it via
+ * [presentAddFlight]; every tab hosts it, so it appears over the current tab.
+ */
+private val addFlightVisible = mutableStateOf(false)
+private var addFlightListener: ((Boolean) -> Unit)? = null
+
+private fun setAddFlightVisible(visible: Boolean) {
+    addFlightVisible.value = visible
+    addFlightListener?.invoke(visible)
+}
+
+@Suppress("unused")
+fun presentAddFlight() = setAddFlightVisible(true)
+
+/** Swift registers to hide its tab bar while the sheet is up. */
+@Suppress("unused")
+fun setAddFlightVisibilityListener(listener: (Boolean) -> Unit) {
+    addFlightListener = listener
+}
+
 private fun glassController(content: @Composable () -> Unit): UIViewController =
     ComposeUIViewController {
         FlightyTheme {
             // Same hard-edge scroll policy as the full-Compose app.
             CompositionLocalProvider(LocalOverscrollFactory provides null) {
                 content()
+                if (addFlightVisible.value) {
+                    AddFlightSheetHost(onDismiss = { setAddFlightVisible(false) })
+                }
             }
         }
     }
@@ -185,20 +208,6 @@ fun PassportTabController(profileAnchor: ProfileMenuAnchor): UIViewController = 
                 scrollEnabled = innerScrollEnabled,
             )
         }
-    }
-}
-
-@Suppress("unused", "FunctionName")
-fun AddFlightController(onDismiss: () -> Unit): UIViewController = glassController {
-    val addFlightViewModel = viewModel { AddFlightViewModel(AppGraph.flightRepository) }
-    val state by addFlightViewModel.uiState.collectAsState()
-    Box(modifier = Modifier.fillMaxSize().background(FlightyColors.SheetBg)) {
-        AddFlightContent(
-            shortcuts = state.shortcuts,
-            suggestions = state.suggestions,
-            onDismiss = onDismiss,
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-        )
     }
 }
 

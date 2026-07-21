@@ -48,7 +48,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import flighty.data.AppGraph
-import flighty.ui.AddFlightContent
+import flighty.ui.AddFlightSheetHost
 import flighty.ui.DetailActionBar
 import flighty.ui.FlightDetailScreen
 import flighty.ui.FlightsScreen
@@ -219,29 +219,7 @@ fun App() {
         }
 
         if (showAddFlight) {
-            val addFlightViewModel = viewModel { AddFlightViewModel(AppGraph.flightRepository) }
-            val state by addFlightViewModel.uiState.collectAsState()
-            ModalBottomSheet(
-                onDismissRequest = { showAddFlight = false },
-                // Flighty's search opens straight to a full-height sheet — no
-                // partial stop, so the enabled values skip PartiallyExpanded.
-                sheetState = rememberBottomSheetState(
-                    initialValue = SheetValue.Hidden,
-                    enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-                ),
-                containerColor = FlightyColors.SheetBg,
-                // From google issue 467297218 (comment #4): the TOP window inset
-                // makes near-full-height sheets oscillate on fast flings — keep
-                // only the bottom inset so content clears the home indicator.
-                contentWindowInsets = { WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom) },
-            ) {
-                AddFlightContent(
-                    shortcuts = state.shortcuts,
-                    suggestions = state.suggestions,
-                    onDismiss = { showAddFlight = false },
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
+            AddFlightSheetHost(onDismiss = { showAddFlight = false })
         }
     }
     }

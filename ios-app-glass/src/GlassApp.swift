@@ -277,20 +277,6 @@ struct PassportTabView: UIViewControllerRepresentable {
     func updateUIViewController(_ vc: UIViewController, context: Context) {}
 }
 
-struct AddFlightView: UIViewControllerRepresentable {
-    let onDismiss: () -> Void
-    func makeUIViewController(context: Context) -> UIViewController {
-        let vc = GlassControllersKt.AddFlightController(onDismiss: onDismiss)
-        // Match the Flighty sheet color before Compose paints its first
-        // frame, so presenting doesn't flash white.
-        vc.view.backgroundColor = UIColor(
-            red: 0.949, green: 0.949, blue: 0.961, alpha: 1
-        )
-        return vc
-    }
-    func updateUIViewController(_ vc: UIViewController, context: Context) {}
-}
-
 struct FullComposeView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
         GlassControllersKt.FullComposeController()
@@ -312,7 +298,7 @@ struct GlassContentView: View {
             get: { selectedTab },
             set: { newValue in
                 if newValue == 3 {
-                    showAddFlight = true
+                    GlassControllersKt.presentAddFlight()
                 } else {
                     selectedTab = newValue
                 }
@@ -325,7 +311,10 @@ struct GlassContentView: View {
                 .ignoresSafeArea()
                 // The demo replaces the tab bar with the detail action bar
                 // while a flight is open.
-                .toolbarVisibility(detailFlightId == nil ? .automatic : .hidden, for: .tabBar)
+                .toolbarVisibility(
+                    (detailFlightId == nil && !showAddFlight) ? .automatic : .hidden,
+                    for: .tabBar
+                )
                 .overlay(alignment: .bottom) {
                     if let flightId = detailFlightId {
                         DetailActionBarView(flightId: flightId)
@@ -334,9 +323,11 @@ struct GlassContentView: View {
             }
             Tab("Friends", systemImage: "person.2.fill", value: 1) {
                 FriendsTabView().ignoresSafeArea()
+                    .toolbarVisibility(showAddFlight ? .hidden : .automatic, for: .tabBar)
             }
             Tab("Passport", systemImage: "person.text.rectangle", value: 2) {
                 PassportTabView().ignoresSafeArea()
+                    .toolbarVisibility(showAddFlight ? .hidden : .automatic, for: .tabBar)
             }
             Tab("Search", systemImage: "magnifyingglass", value: 3, role: .search) {
                 // Never shown: selection is intercepted above.
@@ -349,12 +340,12 @@ struct GlassContentView: View {
         // sheet presentation there is one frame where both Compose canvases
         // are blank and whatever is behind them fills the screen.
         .background(Color(red: 0.016, green: 0.024, blue: 0.047).ignoresSafeArea())
-        .sheet(isPresented: $showAddFlight) {
-            AddFlightView(onDismiss: { showAddFlight = false })
-                .ignoresSafeArea()
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Color(red: 0.949, green: 0.949, blue: 0.961))
+        // The Add Flight sheet lives inside the Compose canvas (see
+        // GlassControllers.kt) — hide the tab bar while it is up.
+        .onAppear {
+            GlassControllersKt.setAddFlightVisibilityListener { visible in
+                withAnimation { showAddFlight = visible.boolValue }
+            }
         }
     }
 }

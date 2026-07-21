@@ -5,16 +5,26 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,18 +38,54 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import flighty.data.AppGraph
 import flighty.model.AddFlightShortcut
 import flighty.model.AddFlightSuggestion
 import flighty.ui.components.AppIcons
+import flighty.vm.AddFlightViewModel
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
+ * The full Add Flight sheet: an M3 modal sheet rendered inside the Compose
+ * canvas, used by every host. The native-chrome iOS app also uses this —
+ * presenting a UIKit modal over a Compose canvas either snapshots the Metal
+ * layer blank (.sheet: white flash) or permanently suspends its rendering
+ * (fullScreenCover: white screen after dismiss) on the current CMP beta.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddFlightSheetHost(onDismiss: () -> Unit) {
+    val addFlightViewModel = viewModel { AddFlightViewModel(AppGraph.flightRepository) }
+    val state by addFlightViewModel.uiState.collectAsState()
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        // Flighty's search opens straight to a full-height sheet — no
+        // partial stop, so the enabled values skip PartiallyExpanded.
+        sheetState = rememberBottomSheetState(
+            initialValue = SheetValue.Hidden,
+            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+        ),
+        containerColor = FlightyColors.SheetBg,
+        // From google issue 467297218 (comment #4): the TOP window inset
+        // makes near-full-height sheets oscillate on fast flings — keep
+        // only the bottom inset so content clears the home indicator.
+        contentWindowInsets = { WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom) },
+    ) {
+        AddFlightContent(
+            shortcuts = state.shortcuts,
+            suggestions = state.suggestions,
+            onDismiss = onDismiss,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+/**
  * The Add Flight search content, matching the reference: smart shortcuts on
  * top, frequently-used entries, then Find by Route under MORE — with the
- * search field focused on open so the keyboard comes up. The full-Compose app
- * hosts it in a ModalBottomSheet; the native-chrome iOS app hosts it in a
- * system sheet (both pass [onDismiss] for the X, matching the demo).
+ * search field focused on open so the keyboard comes up.
  */
 @Composable
 fun AddFlightContent(
