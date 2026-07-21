@@ -1,10 +1,5 @@
 package flighty.ui.components
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -16,20 +11,26 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Canvas as GraphicsCanvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -51,11 +52,16 @@ import shared.generated.resources.earth_tex
 import flighty.model.Flight
 import flighty.model.FlightStatus
 import flighty.ui.FlightyColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Orthographic (true globe) projection: the earth as a sphere seen from space.
@@ -139,15 +145,11 @@ private class GlobeGeometry(
  */
 private class EarthTexture(val pixels: IntArray, val width: Int, val height: Int)
 
-private class GlobeBitmapCache {
-    var key: Float = Float.NaN
-    var bitmap: ImageBitmap? = null
+/** A produced sphere raster tagged with the spin angle it was sampled at. */
+private class SphereFrame(val bitmap: ImageBitmap, val spinDeg: Float)
 
-    // Textured-sphere layer, rendered at half resolution and upscaled.
-    var warp: GlobeWarp? = null
-    var sphere: ImageBitmap? = null
-    var sphereBuf: IntArray? = null
-}
+/** Extra sampled margin (screen px) left of the canvas; see the producer. */
+private const val GLOBE_OVERSCAN_PX = 8f
 
 private fun buildGlobeGeometry(
     flight: Flight?,
@@ -312,12 +314,6 @@ fun SpaceBackdrop(
             }
         }
 
-        val spin = rememberInfiniteTransition().animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(tween(240_000, easing = LinearEasing)),
-        )
-        val cache = remember(flight?.id, widthPx, cropPx) { GlobeBitmapCache() }
         val planePainter = rememberVectorPainter(AppIcons.Plane)
 
         // NASA Blue Marble (public domain), pre-darkened for the space look.
@@ -336,47 +332,106 @@ fun SpaceBackdrop(
             EarthTexture(buf, w, h)
         }
 
-        Canvas(modifier = Modifier.fillMaxWidth().height(cropDp)) {
-            // Read the animation here (draw phase) so spinning never recomposes;
-            // quantize the spin so the cached raster is reused across frames.
-            // 0.1° steps ≈ 1px of surface motion at ~15 rebuilds/s (1.5°/s spin)
-            // — below that the idle drift visibly stutters on Friends/Passport.
-            val lonOffset = if (flight == null) (spin.value * 10).toInt() / 10f else 0f
-            val w = size.width.toInt().coerceAtLeast(1)
-            val h = size.height.toInt().coerceAtLeast(1)
-            var bitmap = cache.bitmap
-            if (cache.key != lonOffset || bitmap == null || bitmap.width != w || bitmap.height != h) {
-                // Geometry is projected in full-screen space; drawing into the
-                // cropped bitmap simply clips everything below the map band.
-                val geo = buildGlobeGeometry(flight, route, widthPx, heightPx, lonOffset)
+        // The textured sphere is produced OFF the UI thread: the warp copy and
+        // pixel upload cost a few ms, and doing them in the draw phase caused
+        // visible hitches whenever a spin step coincided with a sheet drag
+        // frame. A background loop double-buffers the sphere at ~30 Hz and
+        // publishes it through snapshot state; the draw phase blits it with a
+        // sub-pixel horizontal shift that carries the motion between keyframes
+        // at full display rate (over ≤0.05° a spin IS a horizontal shift, and
+        // the <1px residual at the limb hides under the limb shading). One
+        // clock — the spin transition — drives both sampler and shift, so the
+        // texture never drifts out of sync with the draw.
+        val spinDeg: State<Float>? = if (flight == null) {
+            rememberInfiniteTransition(label = "globeSpin").animateFloat(
+                initialValue = 0f,
+                targetValue = 360f,
+                // 240 s per revolution = the reference's 1.5°/s idle drift.
+                animationSpec = infiniteRepeatable(tween(240_000, easing = LinearEasing)),
+                label = "spin",
+            )
+        } else {
+            null
+        }
+        val geometry = remember(flight?.id, widthPx, cropPx) {
+            mutableStateOf<GlobeGeometry?>(null)
+        }
+        val sphere = remember(flight?.id, widthPx, cropPx) {
+            mutableStateOf<SphereFrame?>(null)
+        }
+        LaunchedEffect(flight?.id, widthPx, cropPx) {
+            withContext(Dispatchers.Default) {
+                // Overscan past the left canvas edge: the draw phase slides the
+                // raster rightward to carry motion between keyframes, and
+                // without spare texture there the shift would expose a
+                // flickering unsampled sliver. GLOBE_OVERSCAN_PX of margin
+                // covers shifts from keyframe delays of several frames.
+                val outW = (widthPx.toInt().coerceAtLeast(1) + 1) / 2 +
+                    (GLOBE_OVERSCAN_PX / 2).toInt()
+                val outH = (cropPx.toInt().coerceAtLeast(1) + 1) / 2
+                // Geometry (disk, route, atmosphere anchors) does not depend on
+                // the spin: only the sampled texture columns do.
+                val geo = buildGlobeGeometry(flight, route, widthPx, heightPx, 0f)
+                geometry.value = geo
+                val warp = buildGlobeWarp(
+                    geo.view,
+                    outW,
+                    outH,
+                    2f,
+                    earthTex.width,
+                    earthTex.height,
+                    xStartPx = -GLOBE_OVERSCAN_PX,
+                )
+                val buf = IntArray(outW * outH)
+                val bufferA = ImageBitmap(outW, outH)
+                val bufferB = ImageBitmap(outW, outH)
+                var front = bufferA
 
-                // Warp the earth texture onto the sphere at half resolution.
-                // The warp table is spin-independent (spin is a pure column
-                // shift in the texture), so it's built once per size.
-                val w2 = (w + 1) / 2
-                val h2 = (h + 1) / 2
-                var warp = cache.warp
-                if (warp == null || warp.width != w2 || warp.height != h2) {
-                    warp = buildGlobeWarp(geo.view, w2, h2, 2f, earthTex.width, earthTex.height)
-                    cache.warp = warp
-                    cache.sphereBuf = IntArray(w2 * h2)
-                    cache.sphere = ImageBitmap(w2, h2)
+                if (flight != null || spinDeg == null) {
+                    // Route-framed view: static, sample once.
+                    sampleGlobe(warp, earthTex.pixels, earthTex.width, geo.view.centerLonDeg, buf)
+                    front.writePixels(buf, outW, outH)
+                    sphere.value = SphereFrame(front, 0f)
+                    return@withContext
                 }
-                val sphereBuf = cache.sphereBuf!!
-                val sphere = cache.sphere!!
-                sampleGlobe(warp, earthTex.pixels, earthTex.width, geo.view.centerLonDeg, sphereBuf)
-                sphere.writePixels(sphereBuf, w2, h2)
 
-                val target = bitmap?.takeIf { it.width == w && it.height == h } ?: ImageBitmap(w, h)
-                CanvasDrawScope().draw(this, layoutDirection, GraphicsCanvas(target), Size(size.width, size.height)) {
-                    drawRect(FlightyColors.Space)
-                    drawGlobe(geo, stars, planePainter, sphere)
+                while (isActive) {
+                    val spinNow = spinDeg.value
+                    val back = if (front === bufferA) bufferB else bufferA
+                    sampleGlobe(
+                        warp,
+                        earthTex.pixels,
+                        earthTex.width,
+                        geo.view.centerLonDeg - spinNow,
+                        buf,
+                    )
+                    back.writePixels(buf, outW, outH)
+                    front = back
+                    sphere.value = SphereFrame(front, spinNow)
+                    delay(33.milliseconds)
                 }
-                bitmap = target
-                cache.bitmap = target
-                cache.key = lonOffset
             }
-            drawImage(bitmap)
+        }
+
+        Canvas(modifier = Modifier.fillMaxWidth().height(cropDp)) {
+            drawRect(FlightyColors.Space)
+            val geo = geometry.value
+            val frame = sphere.value
+            if (geo != null && frame != null) {
+                // Westward drift moves surface features rightward on screen at
+                // radius · dθ (equator rate); shift the keyframe by however far
+                // the spin has advanced since it was sampled.
+                var shift = 0f
+                if (spinDeg != null) {
+                    var d = spinDeg.value - frame.spinDeg
+                    if (d < -180f) d += 360f
+                    // Never slide past the sampled overscan margin, even if the
+                    // producer stalls for a while.
+                    shift = (d * geo.view.radius * (PI.toFloat() / 180f))
+                        .coerceIn(0f, GLOBE_OVERSCAN_PX)
+                }
+                drawGlobe(geo, stars, planePainter, frame.bitmap, shift)
+            }
         }
 
         // Airport chips, projected with the same (static, route-framed) view.
@@ -413,6 +468,7 @@ private fun DrawScope.drawGlobe(
     stars: List<Star>,
     planePainter: VectorPainter,
     sphere: ImageBitmap? = null,
+    sphereShiftPx: Float = 0f,
 ) {
     val cx = geo.view.centerX
     val cy = geo.view.centerY
@@ -449,13 +505,20 @@ private fun DrawScope.drawGlobe(
         // circular edge crisp despite the half-resolution upscale, and a limb
         // shading pass restores the sphere's depth over the flat texture.
         clipPath(geo.disk) {
-            drawImage(
-                image = sphere,
-                srcOffset = IntOffset.Zero,
-                srcSize = IntSize(sphere.width, sphere.height),
-                dstOffset = IntOffset.Zero,
-                dstSize = IntSize(size.width.toInt(), size.height.toInt()),
-            )
+            // Float translate (not dstOffset) so the shift stays sub-pixel.
+            // The raster starts GLOBE_OVERSCAN_PX left of the canvas.
+            translate(left = sphereShiftPx - GLOBE_OVERSCAN_PX) {
+                drawImage(
+                    image = sphere,
+                    srcOffset = IntOffset.Zero,
+                    srcSize = IntSize(sphere.width, sphere.height),
+                    dstOffset = IntOffset.Zero,
+                    dstSize = IntSize(
+                        (size.width + GLOBE_OVERSCAN_PX).toInt(),
+                        size.height.toInt(),
+                    ),
+                )
+            }
             drawCircle(
                 brush = Brush.radialGradient(
                     colorStops = arrayOf(
