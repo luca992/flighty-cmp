@@ -1,5 +1,6 @@
 package flighty.data
 
+import flighty.model.AddFlightSuggestion
 import flighty.model.Airline
 import flighty.model.Airport
 import flighty.model.DelayForecast
@@ -180,6 +181,15 @@ object MockFlights {
 
     val upcoming: List<Flight> = all.filter { !it.isPast }
     val past: List<Flight> = all.filter { it.isPast }
+
+    fun byId(id: String): Flight? = all.firstOrNull { it.id == id }
+
+    val addFlightSuggestions: List<AddFlightSuggestion> = listOf(
+        AddFlightSuggestion("AC", Airlines.AirCanada.color, "Air Canada", "AC · ACA"),
+        AddFlightSuggestion("F8", Airlines.Flair.color, "Flair", "F8 · FLE"),
+        AddFlightSuggestion("YYZ", null, "Lester B. Pearson Intl.", "YYZ · CYYZ · Toronto"),
+        AddFlightSuggestion("YVR", null, "Vancouver Intl.", "YVR · CYVR · Vancouver"),
+    )
 
     val friends: List<Friend> = listOf(
         Friend("Sarah Chen", "SC", 0xFF6B5AE0, "AC 103", "YYZ → YVR", FlightStatus.InAir, "Landing in 42m"),

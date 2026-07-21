@@ -1,30 +1,24 @@
 package flighty
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -41,7 +35,9 @@ import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -55,11 +51,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigationevent.NavigationEventInfo
-import androidx.navigationevent.compose.NavigationBackHandler
-import androidx.navigationevent.compose.rememberNavigationEventState
-import flighty.data.MockFlights
-import flighty.model.Flight
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.ui.NavDisplay
+import flighty.data.AppGraph
+import flighty.model.AddFlightSuggestion
 import flighty.ui.FlightDetailScreen
 import flighty.ui.FlightsScreen
 import flighty.ui.FlightyColors
@@ -68,6 +64,12 @@ import flighty.ui.FriendsScreen
 import flighty.ui.PassportScreen
 import flighty.ui.components.AppIcons
 import flighty.ui.components.MapBackdrop
+import flighty.vm.AddFlightViewModel
+import flighty.vm.AppViewModel
+import flighty.vm.FlightDetailViewModel
+import flighty.vm.FlightsViewModel
+import flighty.vm.FriendsViewModel
+import flighty.vm.PassportViewModel
 import kotlinx.coroutines.launch
 
 private enum class Tab(val title: String) {
@@ -75,7 +77,6 @@ private enum class Tab(val title: String) {
     Friends("Friends"),
     Passport("Passport"),
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,29 +86,24 @@ fun App() {
     // min/max bounds (the band's spring-back re-rasterizes the whole sheet per
     // frame on iOS and reads as jerky).
     CompositionLocalProvider(LocalOverscrollFactory provides null) {
+        val appViewModel = viewModel { AppViewModel(AppGraph.flightRepository) }
+        val backStack = remember { mutableStateListOf<AppScreen>(AppScreen.Home) }
         var tab by remember { mutableStateOf(Tab.Flights) }
-        var selectedFlight by remember { mutableStateOf<Flight?>(null) }
-
-        // System back (Android button/gesture) pops the detail sheet instead of
-        // leaving the app — mirrors the X button on iOS.
-        NavigationBackHandler(
-            state = rememberNavigationEventState(NavigationEventInfo.None),
-            isBackEnabled = selectedFlight != null,
-            onBackCompleted = { selectedFlight = null },
-        )
-
         var showAddFlight by remember { mutableStateOf(false) }
+
+        val detailFlight = (backStack.lastOrNull() as? AppScreen.FlightDetail)
+            ?.let { appViewModel.flightById(it.flightId) }
 
         BoxWithConstraints(modifier = Modifier.fillMaxSize().background(FlightyColors.Space)) {
             val screenHeight = maxHeight
-            val peekHeight = if (selectedFlight != null) screenHeight * 0.55f else screenHeight * 0.66f
+            val peekHeight = if (detailFlight != null) screenHeight * 0.55f else screenHeight * 0.66f
 
             // Globe ↔ real map handoff crossfades like the reference video.
-            Crossfade(targetState = selectedFlight, animationSpec = tween(700)) { detailFlight ->
+            Crossfade(targetState = detailFlight, animationSpec = tween(700)) { flight ->
                 MapBackdrop(
-                    flight = detailFlight ?: if (tab == Tab.Flights) MockFlights.live else null,
-                    detail = detailFlight != null,
-                    mapHeightFraction = if (detailFlight != null) 0.45f else 0.34f,
+                    flight = flight ?: if (tab == Tab.Flights) appViewModel.liveFlight else null,
+                    detail = flight != null,
+                    mapHeightFraction = if (flight != null) 0.45f else 0.34f,
                 )
             }
 
@@ -123,7 +119,7 @@ fun App() {
             val passportScrollState = rememberScrollState()
             val detailScrollState = rememberScrollState()
 
-            fun contentAtTop(): Boolean = if (selectedFlight != null) {
+            fun contentAtTop(): Boolean = if (detailFlight != null) {
                 detailScrollState.value == 0
             } else when (tab) {
                 Tab.Flights -> flightsScrollState.value == 0
@@ -186,49 +182,76 @@ fun App() {
                     ) {
                         // Inner scrolling engages only once the sheet is fully
                         // expanded: at peek, gestures are pure sheet drags.
-                        // Gate on the SETTLED value only — targetValue flips the
-                        // moment a collapse fling starts, and recomposing the
-                        // scrollable out of the nested-scroll chain mid-gesture
-                        // is what made collapse flings jump.
+                        // Gate on the SETTLED value only — flipping mid-gesture
+                        // recomposes the scrollable out of the nested-scroll
+                        // chain and makes collapse flings jump.
                         val innerScrollEnabled =
                             sheetState.currentValue == SheetValue.Expanded
-                        AnimatedContent(
-                            targetState = selectedFlight,
-                            transitionSpec = {
-                                (slideInVertically { it / 6 } + fadeIn()) togetherWith
-                                    (slideOutVertically { it / 6 } + fadeOut())
-                            },
-                        ) { flight ->
-                            if (flight != null) {
-                                FlightDetailScreen(
-                                    flight = flight,
-                                    scrollState = detailScrollState,
-                                    scrollEnabled = innerScrollEnabled,
-                                    onBack = { selectedFlight = null },
-                                )
-                            } else {
-                                when (tab) {
-                                    Tab.Flights -> FlightsScreen(
-                                        scrollState = flightsScrollState,
-                                        scrollEnabled = innerScrollEnabled,
-                                        onFlightClick = { selectedFlight = it },
-                                    )
-                                    Tab.Friends -> FriendsScreen(
-                                        scrollState = friendsScrollState,
-                                        scrollEnabled = innerScrollEnabled,
-                                    )
-                                    Tab.Passport -> PassportScreen(
-                                        scrollState = passportScrollState,
-                                        scrollEnabled = innerScrollEnabled,
-                                    )
+
+                        NavDisplay(
+                            backStack = backStack,
+                            onBack = { backStack.removeLastOrNull() },
+                            entryProvider = entryProvider {
+                                entry<AppScreen.Home> {
+                                    when (tab) {
+                                        Tab.Flights -> {
+                                            val flightsViewModel =
+                                                viewModel { FlightsViewModel(AppGraph.flightRepository) }
+                                            val state by flightsViewModel.uiState.collectAsState()
+                                            FlightsScreen(
+                                                state = state,
+                                                onToggleShowPast = flightsViewModel::setShowPast,
+                                                scrollState = flightsScrollState,
+                                                scrollEnabled = innerScrollEnabled,
+                                                onFlightClick = {
+                                                    backStack.add(AppScreen.FlightDetail(it.id))
+                                                },
+                                            )
+                                        }
+                                        Tab.Friends -> {
+                                            val friendsViewModel =
+                                                viewModel { FriendsViewModel(AppGraph.flightRepository) }
+                                            val state by friendsViewModel.uiState.collectAsState()
+                                            FriendsScreen(
+                                                friends = state.friends,
+                                                scrollState = friendsScrollState,
+                                                scrollEnabled = innerScrollEnabled,
+                                            )
+                                        }
+                                        Tab.Passport -> {
+                                            val passportViewModel =
+                                                viewModel { PassportViewModel(AppGraph.flightRepository) }
+                                            val state by passportViewModel.uiState.collectAsState()
+                                            PassportScreen(
+                                                stats = state.stats,
+                                                runningOn = state.runningOn,
+                                                scrollState = passportScrollState,
+                                                scrollEnabled = innerScrollEnabled,
+                                            )
+                                        }
+                                    }
                                 }
-                            }
-                        }
+                                entry<AppScreen.FlightDetail> { key ->
+                                    val detailViewModel = viewModel(key = "detail-${key.flightId}") {
+                                        FlightDetailViewModel(AppGraph.flightRepository, key.flightId)
+                                    }
+                                    val state by detailViewModel.uiState.collectAsState()
+                                    state.flight?.let { flight ->
+                                        FlightDetailScreen(
+                                            flight = flight,
+                                            scrollState = detailScrollState,
+                                            scrollEnabled = innerScrollEnabled,
+                                            onBack = { backStack.removeLastOrNull() },
+                                        )
+                                    }
+                                }
+                            },
+                        )
                     }
                 },
             ) { /* Map area — the backdrop behind the scaffold shows through. */ }
 
-            if (selectedFlight == null) {
+            if (detailFlight == null) {
                 FlightyTabBar(
                     selected = tab,
                     onSelect = { tab = it },
@@ -241,7 +264,12 @@ fun App() {
             }
 
             if (showAddFlight) {
-                AddFlightSheet(onDismiss = { showAddFlight = false })
+                val addFlightViewModel = viewModel { AddFlightViewModel(AppGraph.flightRepository) }
+                val state by addFlightViewModel.uiState.collectAsState()
+                AddFlightSheet(
+                    suggestions = state.suggestions,
+                    onDismiss = { showAddFlight = false },
+                )
             }
         }
     }
@@ -250,7 +278,10 @@ fun App() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddFlightSheet(onDismiss: () -> Unit) {
+private fun AddFlightSheet(
+    suggestions: List<AddFlightSuggestion>,
+    onDismiss: () -> Unit,
+) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = FlightyColors.SheetBg,
@@ -293,32 +324,37 @@ private fun AddFlightSheet(onDismiss: () -> Unit) {
                 color = FlightyColors.TextGray,
                 modifier = Modifier.padding(top = 18.dp, bottom = 6.dp),
             )
-            listOf(
-                Triple(flighty.data.Airlines.AirCanada, "Air Canada", "AC · ACA"),
-                Triple(flighty.data.Airlines.Flair, "Flair", "F8 · FLE"),
-            ).forEach { (airline, name, codes) ->
-                AddFlightRow(name = name, codes = codes) {
-                    flighty.ui.components.AirlineBadge(airline, size = 30)
-                }
-            }
-            listOf(
-                Triple(flighty.data.Airports.YYZ, "Lester B. Pearson Intl.", "YYZ · CYYZ · Toronto"),
-                Triple(flighty.data.Airports.YVR, "Vancouver Intl.", "YVR · CYVR · Vancouver"),
-            ).forEach { (airport, name, codes) ->
-                AddFlightRow(name = name, codes = codes) {
+            suggestions.forEach { suggestion ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                ) {
                     Box(
                         modifier = Modifier
                             .size(30.dp)
-                            .background(FlightyColors.ChipBg, CircleShape),
+                            .background(
+                                suggestion.badgeColor?.let { Color(it) } ?: FlightyColors.ChipBg,
+                                CircleShape,
+                            ),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = airport.code,
-                            fontSize = 8.sp,
+                            text = suggestion.badgeCode,
+                            fontSize = if (suggestion.badgeCode.length > 2) 8.sp else 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = FlightyColors.TextDark,
+                            color = if (suggestion.badgeColor != null) Color.White else FlightyColors.TextDark,
                         )
                     }
+                    Column(modifier = Modifier.padding(start = 10.dp).weight(1f)) {
+                        Text(
+                            text = suggestion.name,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = FlightyColors.TextDark,
+                        )
+                        Text(text = suggestion.codes, fontSize = 11.sp, color = FlightyColors.TextGray)
+                    }
+                    Text(text = "›", fontSize = 16.sp, color = FlightyColors.TextGray)
                 }
             }
             Row(
@@ -340,30 +376,6 @@ private fun AddFlightSheet(onDismiss: () -> Unit) {
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun AddFlightRow(
-    name: String,
-    codes: String,
-    badge: @Composable () -> Unit,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-    ) {
-        badge()
-        Column(modifier = Modifier.padding(start = 10.dp).weight(1f)) {
-            Text(
-                text = name,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = FlightyColors.TextDark,
-            )
-            Text(text = codes, fontSize = 11.sp, color = FlightyColors.TextGray)
-        }
-        Text(text = "›", fontSize = 16.sp, color = FlightyColors.TextGray)
     }
 }
 

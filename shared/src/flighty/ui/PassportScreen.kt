@@ -25,13 +25,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import flighty.data.MockFlights
-import flighty.platformName
+import flighty.model.TravelStats
 import flighty.ui.components.AppIcons
 
 @Composable
-fun PassportScreen(scrollState: ScrollState, scrollEnabled: Boolean) {
-    val stats = MockFlights.stats
+fun PassportScreen(
+    stats: TravelStats,
+    runningOn: String,
+    scrollState: ScrollState,
+    scrollEnabled: Boolean,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -166,7 +169,7 @@ fun PassportScreen(scrollState: ScrollState, scrollEnabled: Boolean) {
 
         Spacer(Modifier.height(16.dp))
         Text(
-            text = "Running on ${platformName()}",
+            text = "Running on $runningOn",
             fontSize = 11.sp,
             color = FlightyColors.TextGray,
             modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 96.dp),

@@ -23,12 +23,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import flighty.data.MockFlights
 import flighty.model.Friend
 import flighty.ui.components.StatusText
 
 @Composable
-fun FriendsScreen(scrollState: ScrollState, scrollEnabled: Boolean) {
+fun FriendsScreen(
+    friends: List<Friend>,
+    scrollState: ScrollState,
+    scrollEnabled: Boolean,
+) {
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
             text = "Friends",
@@ -43,7 +46,7 @@ fun FriendsScreen(scrollState: ScrollState, scrollEnabled: Boolean) {
                 .padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            MockFlights.friends.forEach { friend ->
+            friends.forEach { friend ->
                 FriendCard(friend)
             }
         }

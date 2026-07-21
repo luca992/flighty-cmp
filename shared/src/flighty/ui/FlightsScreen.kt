@@ -34,11 +34,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import flighty.data.MockFlights
 import flighty.model.Flight
 import flighty.model.FlightStatus
 import flighty.platformName
 import flighty.ui.components.AirlineBadge
+import flighty.vm.FlightsUiState
 import flighty.ui.components.FlightContextMenu
 import flighty.ui.components.FlightProgressBar
 import flighty.ui.components.GateChip
@@ -46,13 +46,12 @@ import flighty.ui.components.StatusText
 
 @Composable
 fun FlightsScreen(
+    state: FlightsUiState,
+    onToggleShowPast: (Boolean) -> Unit,
     scrollState: ScrollState,
     scrollEnabled: Boolean,
     onFlightClick: (Flight) -> Unit,
 ) {
-    var showPast by remember { mutableStateOf(false) }
-    val flights = if (showPast) MockFlights.past else MockFlights.upcoming
-
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -65,7 +64,7 @@ fun FlightsScreen(
                 color = FlightyColors.TextDark,
                 modifier = Modifier.weight(1f),
             )
-            SegmentedToggle(showPast = showPast, onChange = { showPast = it })
+            SegmentedToggle(showPast = state.showPast, onChange = onToggleShowPast)
         }
         // Scrolling only engages once the sheet is expanded: the per-frame
         // nested-scroll arbitration between an active inner scrollable and the
@@ -77,7 +76,7 @@ fun FlightsScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             var lastDay: String? = null
-            flights.forEach { flight ->
+            state.flights.forEach { flight ->
                 if (flight.dayLabel != lastDay) {
                     lastDay = flight.dayLabel
                     Text(

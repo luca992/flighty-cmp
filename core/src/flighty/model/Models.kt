@@ -97,6 +97,15 @@ data class Friend(
     val statusNote: String,
 )
 
+/** A row in the Add Flight sheet's "Frequently Used" section. */
+data class AddFlightSuggestion(
+    val badgeCode: String,
+    /** Brand color as 0xAARRGGBB, or null for the neutral airport badge. */
+    val badgeColor: Long?,
+    val name: String,
+    val codes: String,
+)
+
 data class TravelStats(
     val flights: Int,
     val longHaul: Int,

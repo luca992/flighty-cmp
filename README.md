@@ -25,22 +25,34 @@ earth-from-space map backdrop with a light sheet floating over it.
 
 ## Architecture
 
-Everything that can be common **is** common — 100% of app/UI code lives in `shared`'s common
-source set. The platform modules are 3-line entry stubs.
+Two-layer KMP with unidirectional data flow, all in common source sets. The
+platform modules are 3-line entry stubs.
 
 ```
-shared/                  kmp/lib — all app code, all commonMain
+core/                    kmp/lib — Compose-free domain layer
   src/flighty/
     model/               Domain types (Flight, Airport, Airline, Friend, …)
-    data/                Mock data
-    ui/                  Theme, screens, components (SpaceBackdrop map, icons, chips)
-    App.kt               Root composable: backdrop + sheet + tabs + detail navigation
-  src@android|ios|jvm/   One `platformName()` actual each
-  test/                  Common tests for mock-data invariants
+    data/                FlightRepository interface + MockFlightRepository + dataset;
+                         AppGraph is the (deliberately tiny) composition root
+    vm/                  One ViewModel per screen exposing a single immutable
+                         UiState via StateFlow; events are plain functions
+  test/                  Mock-data invariants + ViewModel unit tests
+shared/                  kmp/lib — Compose UI, depends on core
+  src/flighty/
+    Nav.kt               Navigation 3 back-stack keys
+    App.kt               Root: backdrop + sheet + NavDisplay + tab bar;
+                         ViewModels created at nav-entry level
+    ui/                  Screens (state down, events up — they never see a
+                         ViewModel), theme, components
 android-app/             android/app — MainActivity calling App()
 ios-app/                 ios/app — ComposeUIViewController + SwiftUI host (Xcode project included)
 jvm-app/                 jvm/app — desktop window, handy for quick iteration
 ```
+
+Rules of the shape: UI depends on `core`, never the reverse; `core` has no
+Compose dependency; ViewModels depend on `FlightRepository` (the interface), so
+a real backend replaces `MockFlightRepository` without touching presentation;
+navigation is a Navigation 3 back stack (`NavDisplay` + `entryProvider`).
 
 Cross-platform behavior parity: system back on Android pops the detail sheet via the new
 `NavigationBackHandler` (the non-deprecated replacement for `BackHandler`), matching the X button;
