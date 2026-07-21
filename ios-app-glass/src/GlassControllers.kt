@@ -191,14 +191,14 @@ fun PassportTabController(profileAnchor: ProfileMenuAnchor): UIViewController = 
 }
 
 @Suppress("unused", "FunctionName")
-fun AddFlightController(): UIViewController = glassController {
+fun AddFlightController(onDismiss: () -> Unit): UIViewController = glassController {
     val addFlightViewModel = viewModel { AddFlightViewModel(AppGraph.flightRepository) }
     val state by addFlightViewModel.uiState.collectAsState()
     Box(modifier = Modifier.fillMaxSize().background(FlightyColors.SheetBg)) {
-        // The system sheet owns dismissal, so no X button.
         AddFlightContent(
+            shortcuts = state.shortcuts,
             suggestions = state.suggestions,
-            onDismiss = null,
+            onDismiss = onDismiss,
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         )
     }

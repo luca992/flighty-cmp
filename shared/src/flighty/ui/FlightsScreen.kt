@@ -55,7 +55,7 @@ fun FlightsScreen(
         ScreenHeader(
             title = "My Flights",
             profile = state.profile,
-            modifier = Modifier.padding(start = 20.dp, end = 16.dp, top = 6.dp),
+            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp),
         )
         // Scrolling only engages once the sheet is expanded: the per-frame
         // nested-scroll arbitration between an active inner scrollable and the

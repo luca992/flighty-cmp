@@ -269,8 +269,9 @@ struct PassportTabView: UIViewControllerRepresentable {
 }
 
 struct AddFlightView: UIViewControllerRepresentable {
+    let onDismiss: () -> Void
     func makeUIViewController(context: Context) -> UIViewController {
-        GlassControllersKt.AddFlightController()
+        GlassControllersKt.AddFlightController(onDismiss: onDismiss)
     }
     func updateUIViewController(_ vc: UIViewController, context: Context) {}
 }
@@ -320,7 +321,7 @@ struct GlassContentView: View {
         .tabBarMinimizeBehavior(.automatic)
         .tint(.blue)
         .sheet(isPresented: $showAddFlight, onDismiss: { selectedTab = 0 }) {
-            AddFlightView()
+            AddFlightView(onDismiss: { showAddFlight = false })
                 .ignoresSafeArea()
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)

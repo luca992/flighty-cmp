@@ -245,6 +245,7 @@ fun App() {
                 contentWindowInsets = { WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom) },
             ) {
                 AddFlightContent(
+                    shortcuts = state.shortcuts,
                     suggestions = state.suggestions,
                     onDismiss = { showAddFlight = false },
                     modifier = Modifier.fillMaxSize(),

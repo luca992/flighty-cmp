@@ -10,30 +10,45 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import flighty.model.AddFlightShortcut
 import flighty.model.AddFlightSuggestion
 import flighty.ui.components.AppIcons
+import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * The Add Flight search content. The full-Compose app hosts it in a
- * ModalBottomSheet; the native-chrome iOS app hosts it in a system sheet,
- * which provides its own dismissal (pass a null [onDismiss] to hide the X).
+ * The Add Flight search content, matching the reference: smart shortcuts on
+ * top, frequently-used entries, then Find by Route under MORE — with the
+ * search field focused on open so the keyboard comes up. The full-Compose app
+ * hosts it in a ModalBottomSheet; the native-chrome iOS app hosts it in a
+ * system sheet (both pass [onDismiss] for the X, matching the demo).
  */
 @Composable
 fun AddFlightContent(
+    shortcuts: List<AddFlightShortcut>,
     suggestions: List<AddFlightSuggestion>,
     onDismiss: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
+    Column(modifier = modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = "Add Flight",
@@ -65,6 +80,17 @@ fun AddFlightContent(
             color = FlightyColors.TextGray,
             modifier = Modifier.padding(top = 2.dp),
         )
+
+        // Real text field, focused on open — the reference comes up with the
+        // keyboard already showing.
+        var query by remember { mutableStateOf("") }
+        val focusRequester = remember { FocusRequester() }
+        LaunchedEffect(Unit) {
+            // Let the sheet's presentation settle before summoning the
+            // keyboard, or the focus request can get dropped.
+            delay(350.milliseconds)
+            focusRequester.requestFocus()
+        }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -72,19 +98,58 @@ fun AddFlightContent(
                 .background(FlightyColors.ChipBg, RoundedCornerShape(12.dp))
                 .padding(horizontal = 14.dp, vertical = 12.dp),
         ) {
-            Text(
-                text = "Flair, YYZ, or F8123",
-                fontSize = 14.sp,
-                color = FlightyColors.TextGray,
+            if (query.isEmpty()) {
+                Text(
+                    text = "Flair, YYZ, or F8123",
+                    fontSize = 14.sp,
+                    color = FlightyColors.TextGray,
+                )
+            }
+            BasicTextField(
+                value = query,
+                onValueChange = { query = it },
+                singleLine = true,
+                textStyle = TextStyle(fontSize = 14.sp, color = FlightyColors.TextDark),
+                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
             )
         }
+
+        shortcuts.forEachIndexed { index, shortcut ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = if (index == 0) 14.dp else 0.dp, bottom = 10.dp),
+            ) {
+                Icon(
+                    imageVector = if (index == 0) AppIcons.Return else AppIcons.Plane,
+                    contentDescription = null,
+                    tint = FlightyColors.TextDark,
+                    modifier = Modifier.size(18.dp),
+                )
+                Column(modifier = Modifier.padding(start = 12.dp)) {
+                    Text(
+                        text = shortcut.title,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = FlightyColors.TextDark,
+                    )
+                    Text(
+                        text = shortcut.subtitle,
+                        fontSize = 11.sp,
+                        color = FlightyColors.TextGray,
+                    )
+                }
+            }
+        }
+
         Text(
             text = "FREQUENTLY USED",
             fontSize = 11.sp,
             letterSpacing = 1.2.sp,
             fontWeight = FontWeight.SemiBold,
             color = FlightyColors.TextGray,
-            modifier = Modifier.padding(top = 18.dp, bottom = 6.dp),
+            modifier = Modifier.padding(top = 8.dp, bottom = 6.dp),
         )
         suggestions.forEach { suggestion ->
             Row(
@@ -102,12 +167,16 @@ fun AddFlightContent(
                 ) {
                     Text(
                         text = suggestion.badgeCode,
-                        fontSize = if (suggestion.badgeCode.length > 2) 8.sp else 11.sp,
+                        fontSize = when {
+                            suggestion.badgeColor == null -> 15.sp
+                            suggestion.badgeCode.length > 2 -> 8.sp
+                            else -> 11.sp
+                        },
                         fontWeight = FontWeight.Bold,
                         color = if (suggestion.badgeColor != null) Color.White else FlightyColors.TextDark,
                     )
                 }
-                Column(modifier = Modifier.padding(start = 10.dp).weight(1f)) {
+                Column(modifier = Modifier.padding(start = 10.dp)) {
                     Text(
                         text = suggestion.name,
                         fontSize = 14.sp,
@@ -116,25 +185,33 @@ fun AddFlightContent(
                     )
                     Text(text = suggestion.codes, fontSize = 11.sp, color = FlightyColors.TextGray)
                 }
-                Text(text = "›", fontSize = 16.sp, color = FlightyColors.TextGray)
             }
         }
+
+        Text(
+            text = "MORE",
+            fontSize = 11.sp,
+            letterSpacing = 1.2.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = FlightyColors.TextGray,
+            modifier = Modifier.padding(top = 8.dp, bottom = 6.dp),
+        )
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 20.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 20.dp),
         ) {
             Icon(
                 imageVector = AppIcons.Plane,
                 contentDescription = null,
-                tint = FlightyColors.Blue,
+                tint = FlightyColors.TextDark,
                 modifier = Modifier.size(18.dp),
             )
             Text(
                 text = "Find by Route",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = FlightyColors.Blue,
-                modifier = Modifier.padding(start = 10.dp),
+                color = FlightyColors.TextDark,
+                modifier = Modifier.padding(start = 12.dp),
             )
         }
     }

@@ -1,5 +1,6 @@
 package flighty.data
 
+import flighty.model.AddFlightShortcut
 import flighty.model.AddFlightSuggestion
 import flighty.model.Airline
 import flighty.model.Airport
@@ -185,11 +186,16 @@ object MockFlights {
 
     fun byId(id: String): Flight? = all.firstOrNull { it.id == id }
 
+    val addFlightShortcuts: List<AddFlightShortcut> = listOf(
+        AddFlightShortcut("Return Flight", "LHR → YYZ"),
+        AddFlightShortcut("Alternatives for My Next Flight", "YYZ → LHR · Today"),
+    )
+
     val addFlightSuggestions: List<AddFlightSuggestion> = listOf(
-        AddFlightSuggestion("AC", Airlines.AirCanada.color, "Air Canada", "AC · ACA"),
         AddFlightSuggestion("F8", Airlines.Flair.color, "Flair", "F8 · FLE"),
-        AddFlightSuggestion("YYZ", null, "Lester B. Pearson Intl.", "YYZ · CYYZ · Toronto"),
-        AddFlightSuggestion("YVR", null, "Vancouver Intl.", "YVR · CYVR · Vancouver"),
+        AddFlightSuggestion("AC", Airlines.AirCanada.color, "Air Canada", "AC · ACA"),
+        AddFlightSuggestion("🇨🇦", null, "Lester B. Pearson Intl.", "YYZ · CYYZ · Toronto"),
+        AddFlightSuggestion("🇨🇦", null, "Vancouver Intl.", "YVR · CYVR · Vancouver"),
     )
 
     val friends: List<Friend> = listOf(

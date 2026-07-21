@@ -2,6 +2,7 @@ package flighty.vm
 
 import androidx.lifecycle.ViewModel
 import flighty.data.FlightRepository
+import flighty.model.AddFlightShortcut
 import flighty.model.AddFlightSuggestion
 import flighty.model.Flight
 import flighty.model.Friend
@@ -68,9 +69,16 @@ class PassportViewModel(repository: FlightRepository) : ViewModel() {
     )
 }
 
-data class AddFlightUiState(val suggestions: List<AddFlightSuggestion>)
+data class AddFlightUiState(
+    val shortcuts: List<AddFlightShortcut>,
+    val suggestions: List<AddFlightSuggestion>,
+)
 
 class AddFlightViewModel(repository: FlightRepository) : ViewModel() {
-    val uiState: StateFlow<AddFlightUiState> =
-        MutableStateFlow(AddFlightUiState(repository.addFlightSuggestions()))
+    val uiState: StateFlow<AddFlightUiState> = MutableStateFlow(
+        AddFlightUiState(
+            shortcuts = repository.addFlightShortcuts(),
+            suggestions = repository.addFlightSuggestions(),
+        ),
+    )
 }

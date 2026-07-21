@@ -22,7 +22,9 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathBuilder
 import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import flighty.model.Airline
@@ -276,6 +278,21 @@ object AppIcons {
         circle(12f, 12f, 3f)
     }
 
+    /** Return/undo arrow, for the Add Flight "Return Flight" shortcut. */
+    val Return: ImageVector = materialGlyph("Return") {
+        moveTo(12.5f, 8f)
+        curveToRelative(-2.65f, 0f, -5.05f, 0.99f, -6.9f, 2.6f)
+        lineTo(2f, 7f)
+        verticalLineToRelative(9f)
+        horizontalLineToRelative(9f)
+        lineToRelative(-3.62f, -3.62f)
+        curveToRelative(1.39f, -1.16f, 3.16f, -1.88f, 5.12f, -1.88f)
+        curveToRelative(3.54f, 0f, 6.55f, 2.31f, 7.6f, 5.5f)
+        lineToRelative(2.37f, -0.78f)
+        curveTo(21.08f, 11.03f, 17.15f, 8f, 12.5f, 8f)
+        close()
+    }
+
     /** Horizontal three-dot "more" glyph. */
     val More: ImageVector = materialGlyph("More") {
         for (cx in listOf(5f, 12f, 19f)) circle(cx, 12f, 2f)
@@ -329,8 +346,17 @@ fun AirlineBadge(airline: Airline, size: Int = 30, modifier: Modifier = Modifier
         Text(
             text = airline.code,
             color = Color.White,
-            fontSize = (size * 0.36).sp,
-            fontWeight = FontWeight.Bold,
+            style = TextStyle(
+                fontSize = (size * 0.36).sp,
+                fontWeight = FontWeight.Bold,
+                // Trimmed, centered line height: at badge sizes the default
+                // font padding visibly pushes the glyphs off-center.
+                lineHeight = (size * 0.36).sp,
+                lineHeightStyle = LineHeightStyle(
+                    alignment = LineHeightStyle.Alignment.Center,
+                    trim = LineHeightStyle.Trim.Both,
+                ),
+            ),
         )
     }
 }

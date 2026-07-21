@@ -103,6 +103,12 @@ data class Profile(
     val initials: String,
 )
 
+/** A smart shortcut at the top of the Add Flight sheet (e.g. return flight). */
+data class AddFlightShortcut(
+    val title: String,
+    val subtitle: String,
+)
+
 /** A row in the Add Flight sheet's "Frequently Used" section. */
 data class AddFlightSuggestion(
     val badgeCode: String,
