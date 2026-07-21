@@ -32,7 +32,7 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetScaffoldState
-import androidx.compose.material3.rememberStandardBottomSheetState
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
@@ -107,7 +107,7 @@ fun App() {
                 )
             }
 
-            val sheetState = rememberStandardBottomSheetState(initialValue = SheetValue.PartiallyExpanded)
+            val sheetState = rememberBottomSheetState(initialValue = SheetValue.PartiallyExpanded)
             val scaffoldState = rememberBottomSheetScaffoldState(bottomSheetState = sheetState)
             val scope = rememberCoroutineScope()
 

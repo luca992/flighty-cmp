@@ -9,10 +9,15 @@ settings:
     version: 2.4.0
   compose:
     enabled: true
-    version: 1.11.1
+    version: 1.12.0-beta02
   junit: junit-4
   android:
     applicationId: com.flighty.app
     namespace: com.flighty.app
     signing: enabled
+    resourcePackaging:
+      # AGP 9.2 rejects the stray META-INF version markers that ship in some
+      # KMP compose artifacts during MergeJavaRes.
+      excludes:
+        - META-INF/*.version
 

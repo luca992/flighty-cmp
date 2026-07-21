@@ -10,7 +10,7 @@ settings:
     version: 2.4.0
   compose:
     enabled: true
-    version: 1.11.1
+    version: 1.12.0-beta02
 
 # MapLibre Native is an Apple framework distributed via SPM/CocoaPods, which the
 # Kotlin Toolchain can't consume yet. The xcframework is downloaded manually into
