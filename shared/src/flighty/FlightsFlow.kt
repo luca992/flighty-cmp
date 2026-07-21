@@ -70,10 +70,6 @@ fun FlightsFlow(
     FlightyShell(
         backdropFlight = detailFlight ?: appViewModel.liveFlight,
         detail = detailFlight != null,
-        contentAtTop = {
-            if (detailFlight != null) detailScrollState.value == 0
-            else flightsScrollState.value == 0
-        },
         modifier = modifier,
         bottomOverlay = {
             if (detailFlight != null && onDetailShown == null) {

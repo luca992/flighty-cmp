@@ -24,13 +24,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,7 +35,6 @@ import flighty.model.Flight
 import flighty.platformName
 import flighty.ui.components.AppIcons
 import flighty.ui.components.MapBackdrop
-import kotlinx.coroutines.launch
 
 /**
  * The Flighty look shared by every host: map/globe backdrop, floating map
@@ -51,7 +47,6 @@ import kotlinx.coroutines.launch
 fun FlightyShell(
     backdropFlight: Flight?,
     detail: Boolean,
-    contentAtTop: () -> Boolean,
     modifier: Modifier = Modifier,
     bottomOverlay: @Composable BoxScope.() -> Unit = {},
     sheetContent: @Composable (innerScrollEnabled: Boolean) -> Unit,
@@ -87,39 +82,6 @@ fun FlightyShell(
             enabledValues = setOf(SheetValue.PartiallyExpanded, SheetValue.Expanded),
         )
         val scaffoldState = rememberBottomSheetScaffoldState(bottomSheetState = sheetState)
-        val scope = rememberCoroutineScope()
-
-        // Material3's sheet only follows touch drags, and desktop wheel
-        // events skip nested scroll entirely when the list can't consume
-        // them (e.g. at the top). Raw scroll pointer events always arrive,
-        // so drive the sheet from those: scroll up into the content
-        // expands it, scroll down at the top collapses it. Desktop-only —
-        // touch platforms must not pay for this in the drag hot path.
-        // No settled-state (current == target) guards here: an interrupted
-        // expand animation leaves current/target diverged, and requiring them
-        // to match made every branch dead — wheel input just vanished and the
-        // sheet was stuck. Re-issuing expand/partialExpand is safe.
-        val wheelSheetModifier = if (platformName() != "Desktop JVM") Modifier
-        else Modifier.pointerInput(Unit) {
-            awaitPointerEventScope {
-                while (true) {
-                    val event = awaitPointerEvent()
-                    if (event.type != PointerEventType.Scroll) continue
-                    val dy = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
-                    if (dy < -0.2f &&
-                        contentAtTop() &&
-                        sheetState.currentValue == SheetValue.Expanded
-                    ) {
-                        scope.launch { sheetState.partialExpand() }
-                    } else if (dy > 0.2f &&
-                        sheetState.currentValue == SheetValue.PartiallyExpanded &&
-                        sheetState.targetValue != SheetValue.Expanded
-                    ) {
-                        scope.launch { sheetState.expand() }
-                    }
-                }
-            }
-        }
 
         // Drag the sheet or scroll its content to grow it over the map,
         // Flighty-style; drag down to reveal more of the globe.
@@ -142,21 +104,19 @@ fun FlightyShell(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(screenHeight - 72.dp)
-                        .then(wheelSheetModifier),
+                        .height(screenHeight - 72.dp),
                 ) {
-                    // Inner scrolling engages only once the sheet is fully
-                    // expanded: at peek, gestures are pure sheet drags.
-                    // On touch platforms, gate on the SETTLED value only —
-                    // flipping mid-gesture recomposes the scrollable out of
-                    // the nested-scroll chain and makes collapse flings jump.
-                    // Desktop has no drags, so it also accepts the target
-                    // value: with the settled-only gate, a sheet whose expand
-                    // animation was interrupted never re-enabled scrolling.
-                    val innerScrollEnabled =
-                        sheetState.currentValue == SheetValue.Expanded ||
-                            (platformName() == "Desktop JVM" &&
-                                sheetState.targetValue == SheetValue.Expanded)
+                    // Touch platforms: inner scrolling engages only once the
+                    // sheet has SETTLED fully expanded — at peek, gestures are
+                    // pure sheet drags, and a gate that flips mid-gesture
+                    // recomposes the scrollable into the nested-scroll chain
+                    // mid-drag (it steals the gesture and makes collapse
+                    // flings jump on iOS).
+                    // Desktop: the wheel always scrolls content, and the sheet
+                    // is moved by dragging it with the mouse — the platform's
+                    // native model, with no custom wheel interception.
+                    val innerScrollEnabled = platformName() == "Desktop JVM" ||
+                        sheetState.currentValue == SheetValue.Expanded
                     sheetContent(innerScrollEnabled)
                 }
             },

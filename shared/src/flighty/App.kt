@@ -99,15 +99,6 @@ fun App() {
             backdropFlight = detailFlight
                 ?: if (tab == Tab.Flights) appViewModel.liveFlight else null,
             detail = detailFlight != null,
-            contentAtTop = {
-                if (detailFlight != null) {
-                    detailScrollState.value == 0
-                } else when (tab) {
-                    Tab.Flights -> flightsScrollState.value == 0
-                    Tab.Friends -> friendsScrollState.value == 0
-                    Tab.Passport -> passportScrollState.value == 0
-                }
-            },
             bottomOverlay = {
                 if (detailFlight == null) {
                     FlightyTabBar(

@@ -154,8 +154,7 @@ fun FriendsTabController(profileAnchor: ProfileMenuAnchor): UIViewController = g
         FlightyShell(
             backdropFlight = null,
             detail = false,
-            contentAtTop = { scrollState.value == 0 },
-        ) { innerScrollEnabled ->
+            ) { innerScrollEnabled ->
             FriendsScreen(
                 friends = state.friends,
                 profile = state.profile,
@@ -177,8 +176,7 @@ fun PassportTabController(profileAnchor: ProfileMenuAnchor): UIViewController = 
         FlightyShell(
             backdropFlight = null,
             detail = false,
-            contentAtTop = { scrollState.value == 0 },
-        ) { innerScrollEnabled ->
+            ) { innerScrollEnabled ->
             PassportScreen(
                 stats = state.stats,
                 runningOn = state.runningOn + " · Liquid Glass",
