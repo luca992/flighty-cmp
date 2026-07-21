@@ -1,14 +1,29 @@
 package flighty.ui.components
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import flighty.model.Flight
 import flighty.model.FlightStatus
@@ -22,9 +37,15 @@ import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.style.BaseStyle
+import org.maplibre.compose.util.MaplibreComposable
 import org.maplibre.spatialk.geojson.Position
+import kotlinx.coroutines.delay
+import kotlin.math.PI
+import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.ln
 import kotlin.math.max
+import kotlin.math.sin
 import kotlin.time.Duration.Companion.milliseconds
 
 /** Dark, key-free vector style (OpenFreeMap / OpenStreetMap data). */
@@ -57,14 +78,20 @@ fun MaplibreRouteMap(
                 zoom = (targetZoom - 2.6).coerceAtLeast(0.3),
             ),
         )
+        var cameraSettled by remember(flight.id) { mutableStateOf(false) }
         LaunchedEffect(flight.id) {
+            // The backdrop already defers mounting this map until the entrance
+            // animation settles; this small extra beat gives the surface/style
+            // init room before the camera starts moving (jank-prone on Android).
+            delay(150.milliseconds)
             camera.animateTo(
                 finalPosition = CameraPosition(
                     target = Position(longitude = mid.first, latitude = mid.second),
                     zoom = targetZoom,
                 ),
-                duration = 1400.milliseconds,
+                duration = 1200.milliseconds,
             )
+            cameraSettled = true
         }
         MaplibreMap(
             modifier = Modifier
@@ -72,48 +99,124 @@ fun MaplibreRouteMap(
                 .height(mapHeight),
             baseStyle = BaseStyle.Uri(MAP_STYLE_DARK),
             cameraState = camera,
+            // The lambda's MapLibre target is declared explicitly: the Native
+            // compiler drops the @MaplibreComposable marker from the library's
+            // deserialized signature, so without this it infers a UI target.
+            content = @MaplibreComposable { RouteLayers(flight = flight, route = route) },
+        )
+
+        // The aircraft is a Compose overlay: registering a style image would be
+        // the native way, but maplibre-compose 0.13's iOS path crashes against
+        // Compose 1.12's Skiko (Image.encodeToData was removed — IrLinkageError).
+        // It appears only after the fly-in settles, so the overlay never has to
+        // chase the animating camera; afterwards it re-places itself in the
+        // layout placement phase (the offset lambda) as the user pans.
+        androidx.compose.animation.AnimatedVisibility(
+            visible = cameraSettled,
+            enter = fadeIn(tween(350)),
         ) {
-            val lineSource = rememberGeoJsonSource(
-                GeoJsonData.JsonString(remember(flight.id) { lineFeature(route) }),
-            )
-            val endpointSource = rememberGeoJsonSource(
-                GeoJsonData.JsonString(remember(flight.id) { endpointFeatures(route) }),
-            )
-            val planeSource = rememberGeoJsonSource(
-                GeoJsonData.JsonString(remember(flight.id) { planeFeature(flight, route) }),
-            )
-            LineLayer(
-                id = "flighty-route-glow",
-                source = lineSource,
-                color = const(FlightyColors.Route.copy(alpha = 0.35f)),
-                width = const(7.dp),
-            )
-            LineLayer(
-                id = "flighty-route",
-                source = lineSource,
-                color = const(FlightyColors.Route),
-                width = const(3.dp),
-            )
-            CircleLayer(
-                id = "flighty-route-endpoints",
-                source = endpointSource,
-                color = const(Color.White),
-                radius = const(4.dp),
-            )
-            CircleLayer(
-                id = "flighty-plane-halo",
-                source = planeSource,
-                color = const(FlightyColors.Route),
-                radius = const(8.dp),
-            )
-            CircleLayer(
-                id = "flighty-plane",
-                source = planeSource,
-                color = const(Color.White),
-                radius = const(3.dp),
+            val plane = remember(flight.id) { planePosition(flight, route) }
+            val bearing = remember(flight.id) { routeBearing(flight, route) }
+            val planePainter = rememberVectorPainter(AppIcons.Plane)
+            Spacer(
+                modifier = Modifier
+                    .offset {
+                        camera.position
+                        val loc = camera.projection?.screenLocationFromPosition(
+                            Position(longitude = plane.first, latitude = plane.second),
+                        ) ?: DpOffset(x = (-100).dp, y = (-100).dp)
+                        IntOffset((loc.x - 13.dp).roundToPx(), (loc.y - 13.dp).roundToPx())
+                    }
+                    .size(26.dp)
+                    .drawBehind {
+                        rotate(degrees = bearing) {
+                            val outline = ColorFilter.tint(Color(0xCC1A2433))
+                            for ((ox, oy) in listOf(-1f to 0f, 1f to 0f, 0f to -1f, 0f to 1f)) {
+                                translate(left = ox.dp.toPx(), top = oy.dp.toPx()) {
+                                    with(planePainter) { draw(size, colorFilter = outline) }
+                                }
+                            }
+                            with(planePainter) {
+                                draw(size, colorFilter = ColorFilter.tint(Color.White))
+                            }
+                        }
+                    },
             )
         }
     }
+}
+
+private fun planePosition(flight: Flight, route: List<Pair<Double, Double>>): Pair<Double, Double> {
+    val progress = when (flight.status) {
+        FlightStatus.InAir -> flight.progress
+        FlightStatus.Landed -> 1f
+        else -> 0f
+    }
+    val index = ((route.size - 1) * progress).toInt().coerceIn(0, route.size - 1)
+    return route[index]
+}
+
+/**
+ * Route line, endpoints, and the aircraft symbol. Declared with the library's
+ * [MaplibreComposable] target marker: layer composables run in the map's own
+ * applier, and declaring that explicitly (rather than relying on cross-klib
+ * target inference, which the Native compiler gets wrong) is what keeps the
+ * applier-mismatch diagnostics away.
+ */
+@Composable
+@MaplibreComposable
+private fun RouteLayers(flight: Flight, route: List<Pair<Double, Double>>) {
+    val lineSource = rememberGeoJsonSource(
+        GeoJsonData.JsonString(remember(flight.id) { lineFeature(route) }),
+    )
+    val endpointSource = rememberGeoJsonSource(
+        GeoJsonData.JsonString(remember(flight.id) { endpointFeatures(route) }),
+    )
+    val planeSource = rememberGeoJsonSource(
+        GeoJsonData.JsonString(remember(flight.id) { planeFeature(flight, route) }),
+    )
+    LineLayer(
+        id = "flighty-route-glow",
+        source = lineSource,
+        color = const(FlightyColors.Route.copy(alpha = 0.35f)),
+        width = const(7.dp),
+    )
+    LineLayer(
+        id = "flighty-route",
+        source = lineSource,
+        color = const(FlightyColors.Route),
+        width = const(3.dp),
+    )
+    CircleLayer(
+        id = "flighty-route-endpoints",
+        source = endpointSource,
+        color = const(Color.White),
+        radius = const(4.dp),
+    )
+    CircleLayer(
+        id = "flighty-plane-anchor",
+        source = planeSource,
+        color = const(FlightyColors.Route),
+        radius = const(2.dp),
+    )
+}
+
+/** Heading of the route at the plane's position, in degrees clockwise from north. */
+private fun routeBearing(flight: Flight, route: List<Pair<Double, Double>>): Float {
+    val progress = when (flight.status) {
+        FlightStatus.InAir -> flight.progress
+        FlightStatus.Landed -> 1f
+        else -> 0f
+    }
+    val i = ((route.size - 1) * progress).toInt().coerceIn(0, route.size - 2)
+    val (lon1, lat1) = route[i]
+    val (lon2, lat2) = route[i + 1]
+    val toRad = PI / 180.0
+    val dLon = (lon2 - lon1) * toRad
+    val y = sin(dLon) * cos(lat2 * toRad)
+    val x = cos(lat1 * toRad) * sin(lat2 * toRad) -
+        sin(lat1 * toRad) * cos(lat2 * toRad) * cos(dLon)
+    return (atan2(y, x) / toRad).toFloat()
 }
 
 private fun zoomFor(route: List<Pair<Double, Double>>): Double {

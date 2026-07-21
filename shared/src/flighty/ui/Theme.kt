@@ -35,8 +35,8 @@ object FlightyColors {
     val GateChipText = Color(0xFF6B4E00)
 
     // Passport cards
-    val IndigoTop = Color(0xFF46429B)
-    val IndigoBottom = Color(0xFF232055)
+    val IndigoTop = Color(0xFF251A56)
+    val IndigoBottom = Color(0xFF2F4BA6)
     val RedCardTop = Color(0xFFB3122F)
     val RedCardBottom = Color(0xFF6E0A1E)
 }

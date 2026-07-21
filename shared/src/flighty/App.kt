@@ -3,6 +3,7 @@ package flighty
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -106,6 +108,15 @@ fun App() {
                     ?: if (tab == Tab.Flights) appViewModel.liveFlight else null,
                 detail = detailFlight != null,
                 mapHeightFraction = if (detailFlight != null) 0.45f else 0.34f,
+            )
+
+            // Flighty's map controls sit over the backdrop but under the sheet:
+            // they must disappear behind it as the sheet expands.
+            MapControlsOverlay(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(top = 6.dp, end = 10.dp),
             )
 
             val sheetState = rememberBottomSheetState(
@@ -272,6 +283,13 @@ fun App() {
                         .navigationBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 10.dp),
                 )
+            } else {
+                DetailActionBar(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                )
             }
 
             if (showAddFlight) {
@@ -295,13 +313,23 @@ private fun AddFlightSheet(
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        // Flighty's search opens straight to a full-height sheet — no partial
+        // stop, so the enabled values skip PartiallyExpanded entirely.
+        sheetState = rememberBottomSheetState(
+            initialValue = SheetValue.Hidden,
+            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+        ),
         containerColor = FlightyColors.SheetBg,
         // From google issue 467297218 (comment #4): the TOP window inset makes
         // near-full-height sheets oscillate on fast flings — keep only the
         // bottom inset so content still clears the home indicator.
         contentWindowInsets = { WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom) },
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp, vertical = 4.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "Add Flight",
@@ -453,6 +481,84 @@ private fun FlightyTabBar(
             }
         }
     }
+}
+
+@Composable
+private fun MapControlsOverlay(modifier: Modifier = Modifier) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier,
+    ) {
+        MapControlButton(AppIcons.Map, "Map style")
+        MapControlButton(AppIcons.Cloud, "Weather")
+        MapControlButton(AppIcons.Locate, "Live tracking")
+    }
+}
+
+@Composable
+private fun MapControlButton(icon: ImageVector, description: String) {
+    Box(
+        modifier = Modifier
+            .size(30.dp)
+            .background(Color(0x66141922), RoundedCornerShape(9.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = description,
+            tint = Color.White.copy(alpha = 0.92f),
+            modifier = Modifier.size(15.dp),
+        )
+    }
+}
+
+/**
+ * The share / alerts / more cluster plus the Add Return pill that floats over
+ * the bottom of the flight-detail sheet, standing in for the tab bar there.
+ */
+@Composable
+private fun DetailActionBar(modifier: Modifier = Modifier) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier.fillMaxWidth()) {
+        Surface(
+            color = FlightyColors.CardBg,
+            shape = RoundedCornerShape(50),
+            shadowElevation = 6.dp,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+            ) {
+                DetailActionIcon(AppIcons.Share, "Share")
+                DetailActionIcon(AppIcons.BellOff, "Alerts")
+                DetailActionIcon(AppIcons.More, "More")
+            }
+        }
+        Spacer(Modifier.weight(1f))
+        Surface(
+            color = FlightyColors.Blue,
+            shape = RoundedCornerShape(50),
+            shadowElevation = 6.dp,
+        ) {
+            Text(
+                text = "Add Return",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 13.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DetailActionIcon(icon: ImageVector, description: String) {
+    Icon(
+        imageVector = icon,
+        contentDescription = description,
+        tint = FlightyColors.TextDark,
+        modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp).size(19.dp),
+    )
 }
 
 @Composable

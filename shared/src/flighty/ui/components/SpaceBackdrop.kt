@@ -28,10 +28,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.vector.VectorPainter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,6 +45,7 @@ import flighty.model.Flight
 import flighty.model.FlightStatus
 import flighty.ui.FlightyColors
 import kotlin.math.PI
+import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -114,6 +120,8 @@ private class GlobeGeometry(
     val routeStart: Offset?,
     val routeEnd: Offset?,
     val plane: Offset?,
+    /** Screen-space heading of the route at the plane, degrees from +x. */
+    val planeAngleDeg: Float,
 )
 
 /**
@@ -203,6 +211,7 @@ private fun buildGlobeGeometry(
     var routeStart: Offset? = null
     var routeEnd: Offset? = null
     var plane: Offset? = null
+    var planeAngleDeg = 0f
     if (route != null && flight != null) {
         val arc = Path()
         var started = false
@@ -221,19 +230,29 @@ private fun buildGlobeGeometry(
             FlightStatus.Landed -> 1f
             else -> 0f
         }
-        val p = route[((route.size - 1) * t).toInt().coerceIn(0, route.size - 1)]
+        val planeIndex = ((route.size - 1) * t).toInt().coerceIn(0, route.size - 1)
+        val p = route[planeIndex]
         val (px, py, pv) = view.project(p.first, p.second)
-        if (pv) plane = Offset(px, py)
+        if (pv) {
+            plane = Offset(px, py)
+            val next = route[(planeIndex + 1).coerceAtMost(route.size - 1)]
+            val (nx, ny, nv) = view.project(next.first, next.second)
+            if (nv && (nx != px || ny != py)) {
+                planeAngleDeg = (atan2(ny - py, nx - px) * 180.0 / PI).toFloat()
+            }
+        }
     }
 
-    return GlobeGeometry(view, disk, graticule, land, cityLights, routePath, routeStart, routeEnd, plane)
+    return GlobeGeometry(
+        view, disk, graticule, land, cityLights, routePath, routeStart, routeEnd, plane, planeAngleDeg,
+    )
 }
 
 /**
  * The earth from space, drawn in common code with an orthographic projection
  * of real Natural Earth coastlines. Idle screens drift slowly; the animation
  * only invalidates the draw phase, and projected geometry is cached and
- * rebuilt just a few times per second (0.5° spin steps ≈ 1px).
+ * rebuilt ~15 times per second (0.1° spin steps ≈ 1px of surface motion).
  */
 // Perf A/B switch — false renders a plain dark backdrop with no globe.
 // Verified 2026-07-21: sheet-fling jank on iOS is identical with the globe
@@ -285,11 +304,14 @@ fun SpaceBackdrop(
             animationSpec = infiniteRepeatable(tween(240_000, easing = LinearEasing)),
         )
         val cache = remember(flight?.id, widthPx, cropPx) { GlobeBitmapCache() }
+        val planePainter = rememberVectorPainter(AppIcons.Plane)
 
         Canvas(modifier = Modifier.fillMaxWidth().height(cropDp)) {
             // Read the animation here (draw phase) so spinning never recomposes;
-            // quantize to 0.5° so the cached raster is reused across frames.
-            val lonOffset = if (flight == null) (spin.value * 2).toInt() / 2f else 0f
+            // quantize the spin so the cached raster is reused across frames.
+            // 0.1° steps ≈ 1px of surface motion at ~15 rebuilds/s (1.5°/s spin)
+            // — below that the idle drift visibly stutters on Friends/Passport.
+            val lonOffset = if (flight == null) (spin.value * 10).toInt() / 10f else 0f
             val w = size.width.toInt().coerceAtLeast(1)
             val h = size.height.toInt().coerceAtLeast(1)
             var bitmap = cache.bitmap
@@ -300,7 +322,7 @@ fun SpaceBackdrop(
                 val target = bitmap?.takeIf { it.width == w && it.height == h } ?: ImageBitmap(w, h)
                 CanvasDrawScope().draw(this, layoutDirection, GraphicsCanvas(target), Size(size.width, size.height)) {
                     drawRect(FlightyColors.Space)
-                    drawGlobe(geo, stars)
+                    drawGlobe(geo, stars, planePainter)
                 }
                 bitmap = target
                 cache.bitmap = target
@@ -338,7 +360,11 @@ fun SpaceBackdrop(
     }
 }
 
-private fun DrawScope.drawGlobe(geo: GlobeGeometry, stars: List<Star>) {
+private fun DrawScope.drawGlobe(
+    geo: GlobeGeometry,
+    stars: List<Star>,
+    planePainter: VectorPainter,
+) {
     val cx = geo.view.centerX
     val cy = geo.view.centerY
     val r = geo.view.radius
@@ -392,10 +418,24 @@ private fun DrawScope.drawGlobe(geo: GlobeGeometry, stars: List<Star>) {
     }
     geo.routeStart?.let { drawCircle(Color.White, 6f, it) }
     geo.routeEnd?.let { drawCircle(Color.White, 6f, it) }
-    geo.plane?.let {
-        drawCircle(FlightyColors.Route.copy(alpha = 0.30f), 22f, it)
-        drawCircle(FlightyColors.Route, 9f, it)
-        drawCircle(Color.White, 3.5f, it)
+    geo.plane?.let { center ->
+        // The glyph points north, so screen-heading needs a +90° correction.
+        rotate(degrees = geo.planeAngleDeg + 90f, pivot = center) {
+            val s = 30f
+            val outline = ColorFilter.tint(Color(0xCC1A2433))
+            // Four offset passes of a dark tint form a light outline that keeps
+            // the white glyph readable over bright parts of the globe.
+            for ((ox, oy) in listOf(-1.5f to 0f, 1.5f to 0f, 0f to -1.5f, 0f to 1.5f)) {
+                translate(left = center.x - s / 2 + ox, top = center.y - s / 2 + oy) {
+                    with(planePainter) { draw(Size(s, s), colorFilter = outline) }
+                }
+            }
+            translate(left = center.x - s / 2, top = center.y - s / 2) {
+                with(planePainter) {
+                    draw(Size(s, s), colorFilter = ColorFilter.tint(Color.White))
+                }
+            }
+        }
     }
 }
 

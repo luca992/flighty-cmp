@@ -1,9 +1,12 @@
 package flighty.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,9 +27,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -37,6 +40,9 @@ import flighty.ui.components.AirlineBadge
 import flighty.ui.components.AppIcons
 import flighty.ui.components.FlightProgressBar
 import flighty.ui.components.GateChip
+import org.jetbrains.compose.resources.painterResource
+import shared.generated.resources.Res
+import shared.generated.resources.plane_ac
 
 /**
  * The light sheet content for a flight — the map above it is drawn by the
@@ -153,7 +159,6 @@ fun FlightDetailScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             InfoTile("BOOKING CODE", flight.bookingCode ?: "—", Modifier.weight(1f))
             InfoTile("SEAT", flight.seat ?: "—", Modifier.weight(1f))
-            AddReturnButton(Modifier.weight(1f))
         }
 
         flight.delayForecast?.let { forecast ->
@@ -177,7 +182,8 @@ fun FlightDetailScreen(
             text = "Mock data · built with Compose Multiplatform",
             fontSize = 11.sp,
             color = FlightyColors.TextGray,
-            modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 16.dp),
+            // Extra clearance so the floating action bar never covers content.
+            modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 96.dp),
         )
     }
 }
@@ -244,67 +250,99 @@ private fun DelayForecastCard(forecast: flighty.model.DelayForecast) {
 @Composable
 private fun WheresMyPlaneCard(flight: Flight, note: String) {
     Surface(color = FlightyColors.CardBg, shape = RoundedCornerShape(18.dp)) {
-        Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
-            Text(
-                text = "Where's My Plane?",
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                color = FlightyColors.Blue,
-            )
-            Text(
-                text = flight.aircraft + (flight.aircraftInfo?.let { " · ${it.substringBefore(" ·")}" } ?: ""),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = FlightyColors.Blue.copy(alpha = 0.75f),
-            )
-            flight.aircraftInfo?.let {
-                Text(
-                    text = it.substringAfter("· ", it),
-                    fontSize = 11.sp,
-                    color = FlightyColors.TextGray,
-                )
-            }
-            Spacer(Modifier.height(10.dp))
-            // Sky banner standing in for the aircraft photo the real app shows.
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Sky header with the reference's proportions: the box is ~1.9:1,
+            // titles overlay the top-left, and the plane fills 86% of the
+            // width — so it always dominates the box with sky to spare.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(110.dp)
+                    .aspectRatio(1.9f)
                     .background(
                         Brush.verticalGradient(
-                            listOf(Color(0xFF7DB4E8), Color(0xFFB8D7F2), Color(0xFFE4F0FA)),
+                            listOf(Color(0xFF4E8FD4), Color(0xFF9CC3EA), Color(0xFFDCEBF8)),
                         ),
-                        RoundedCornerShape(12.dp),
+                        RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
                     ),
-                contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = AppIcons.Plane,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(64.dp).rotate(90f),
+                Column(modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 12.dp)) {
+                    Text(
+                        text = "Where's My Plane?",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                    )
+                    Text(
+                        text = flight.aircraft +
+                            (flight.aircraftInfo?.let { " · ${it.substringBefore(" ·")}" } ?: ""),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White.copy(alpha = 0.85f),
+                    )
+                }
+                // The plane's box is sized explicitly from the header width at
+                // the asset's exact ratio (958x276 after trimming its
+                // transparent margins): neither the resource loader's intrinsic
+                // size nor aspect-ratio negotiation gets a say, so the photo
+                // can't render small or distorted.
+                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    val planeWidth = maxWidth * 0.86f
+                    Image(
+                        painter = painterResource(Res.drawable.plane_ac),
+                        contentDescription = flight.aircraft,
+                        contentScale = ContentScale.FillBounds,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(top = 28.dp)
+                            .size(width = planeWidth, height = planeWidth * (276f / 958f)),
+                    )
+                }
+            }
+
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    text = "PRO",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
+                    color = Color.White,
+                    modifier = Modifier
+                        .background(Color(0xFF8B2FD6), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "See if your plane is late and get alerts – it's the #1 cause of all delays ›",
+                    fontSize = 13.sp,
+                    color = FlightyColors.TextDark,
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "This Flight",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = FlightyColors.TextDark,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = if (flight.late) {
+                            "Departed ${flight.departNote.substringBefore(" ·").lowercase()}"
+                        } else {
+                            "Departed on time"
+                        },
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (flight.late) FlightyColors.RedTime else FlightyColors.GreenTime,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = note,
+                    fontSize = 12.sp,
+                    color = FlightyColors.TextGray,
                 )
             }
-            Spacer(Modifier.height(10.dp))
-            Text(
-                text = if (flight.late) "⚠ MINOR DELAYS" else "✓ NO ISSUE",
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.8.sp,
-                color = Color.White,
-                modifier = Modifier
-                    .background(
-                        if (flight.late) Color(0xFFE8A013) else FlightyColors.GreenTime,
-                        RoundedCornerShape(50),
-                    )
-                    .padding(horizontal = 9.dp, vertical = 3.dp),
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = note,
-                fontSize = 12.sp,
-                color = FlightyColors.TextGray,
-            )
         }
     }
 }
@@ -427,19 +465,50 @@ private fun GoodToKnowRow(text: String) {
 @Composable
 private fun StatusHeadline(flight: Flight) {
     val (prefix, value, tint) = when (flight.status) {
-        FlightStatus.InAir -> Triple("Landing in ", flight.landingIn ?: "", FlightyColors.GreenTime)
+        FlightStatus.InAir -> Triple(
+            "Landing in ",
+            flight.landingIn ?: "",
+            if (flight.late) FlightyColors.RedTime else FlightyColors.GreenTime,
+        )
         FlightStatus.Scheduled -> Triple("Departs at ", flight.departTime, FlightyColors.GreenTime)
         FlightStatus.Delayed -> Triple("Now departs at ", flight.departTime, FlightyColors.RedTime)
         FlightStatus.Landed -> Triple("Arrived ", flight.arriveTime, FlightyColors.GreenTime)
     }
-    Row(modifier = Modifier.padding(top = 2.dp)) {
-        Text(text = prefix, fontSize = 15.sp, color = FlightyColors.TextDark)
-        Text(
-            text = value,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            color = tint,
-        )
+    val sub = when (flight.status) {
+        FlightStatus.Landed -> flight.arriveNote
+        FlightStatus.Delayed -> flight.departNote
+        FlightStatus.InAir, FlightStatus.Scheduled -> null
+    }
+    // Flighty renders this as a status-tinted banner strip with a disclosure
+    // chevron (pink for a late flight, pale green once arrived).
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+            .background(tint.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Row {
+                Text(text = prefix, fontSize = 15.sp, color = FlightyColors.TextDark)
+                Text(
+                    text = value,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = tint,
+                )
+            }
+            if (sub != null) {
+                Text(
+                    text = sub,
+                    fontSize = 11.sp,
+                    color = FlightyColors.TextGray,
+                    modifier = Modifier.padding(top = 1.dp),
+                )
+            }
+        }
+        Text(text = "›", fontSize = 18.sp, color = FlightyColors.TextGray)
     }
 }
 
@@ -538,24 +607,3 @@ private fun InfoTile(label: String, value: String, modifier: Modifier = Modifier
     }
 }
 
-@Composable
-private fun AddReturnButton(modifier: Modifier = Modifier) {
-    Surface(
-        color = FlightyColors.Blue,
-        shape = RoundedCornerShape(14.dp),
-        modifier = modifier.clickable(onClick = { /* mock */ }),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 18.dp),
-        ) {
-            Text(
-                text = "Add Return",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White,
-            )
-        }
-    }
-}

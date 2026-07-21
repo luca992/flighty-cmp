@@ -1,9 +1,16 @@
 package flighty.ui.components
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import flighty.model.Flight
 import flighty.platformName
+import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * The backdrop behind the sheet, matching Flighty's two moods:
@@ -19,7 +26,20 @@ fun MapBackdrop(
     modifier: Modifier = Modifier,
 ) {
     if (detail && flight != null && platformName() != "Desktop JVM") {
-        MaplibreRouteMap(flight, mapHeightFraction, modifier)
+        // The native map view only mounts once the detail entrance animation
+        // has settled: its surface creation and style load land on the UI
+        // thread, and mounting mid-transition visibly janks the slide-in
+        // (worst on Android). The globe keeps rendering underneath meanwhile.
+        var mountMap by remember(flight.id) { mutableStateOf(false) }
+        LaunchedEffect(flight.id) {
+            delay(500.milliseconds)
+            mountMap = true
+        }
+        if (mountMap) {
+            MaplibreRouteMap(flight, mapHeightFraction, modifier)
+        } else {
+            SpaceBackdrop(flight, mapHeightFraction, modifier)
+        }
     } else {
         SpaceBackdrop(flight, mapHeightFraction, modifier)
     }

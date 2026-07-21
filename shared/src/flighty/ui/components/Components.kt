@@ -33,6 +33,7 @@ import flighty.ui.tint
 
 private fun materialGlyph(
     name: String,
+    fillType: PathFillType = PathFillType.NonZero,
     block: PathBuilder.() -> Unit,
 ): ImageVector = ImageVector.Builder(
     name = name,
@@ -41,7 +42,7 @@ private fun materialGlyph(
     viewportWidth = 24f,
     viewportHeight = 24f,
 ).apply {
-    path(fill = SolidColor(Color.White), pathFillType = PathFillType.NonZero, pathBuilder = block)
+    path(fill = SolidColor(Color.White), pathFillType = fillType, pathBuilder = block)
 }.build()
 
 /**
@@ -196,6 +197,83 @@ object AppIcons {
         curveToRelative(1.61f, 0f, 2.92f, -1.31f, 2.92f, -2.92f)
         reflectiveCurveToRelative(-1.31f, -2.92f, -2.92f, -2.92f)
         close()
+    }
+
+    /** Notifications bell with a "muted" slash, as on Flighty's detail action bar. */
+    val BellOff: ImageVector = materialGlyph("BellOff") {
+        // Bell body + clapper.
+        moveTo(12f, 22f)
+        curveToRelative(1.1f, 0f, 2f, -0.9f, 2f, -2f)
+        horizontalLineToRelative(-4f)
+        curveToRelative(0f, 1.1f, 0.9f, 2f, 2f, 2f)
+        close()
+        moveTo(18f, 16f)
+        verticalLineToRelative(-5f)
+        curveToRelative(0f, -3.07f, -1.63f, -5.64f, -4.5f, -6.32f)
+        verticalLineTo(4f)
+        curveToRelative(0f, -0.83f, -0.67f, -1.5f, -1.5f, -1.5f)
+        reflectiveCurveToRelative(-1.5f, 0.67f, -1.5f, 1.5f)
+        verticalLineToRelative(0.68f)
+        curveTo(7.64f, 5.36f, 6f, 7.92f, 6f, 11f)
+        verticalLineToRelative(5f)
+        lineToRelative(-2f, 2f)
+        verticalLineToRelative(1f)
+        horizontalLineToRelative(16f)
+        verticalLineToRelative(-1f)
+        lineToRelative(-2f, -2f)
+        close()
+        // Diagonal mute slash.
+        moveTo(3.4f, 4.8f)
+        lineTo(4.8f, 3.4f)
+        lineTo(20.6f, 19.2f)
+        lineTo(19.2f, 20.6f)
+        close()
+    }
+
+    /** Weather-layer cloud. */
+    val Cloud: ImageVector = materialGlyph("Cloud") {
+        moveTo(19.35f, 10.04f)
+        curveTo(18.67f, 6.59f, 15.64f, 4f, 12f, 4f)
+        curveTo(9.11f, 4f, 6.6f, 5.64f, 5.35f, 8.04f)
+        curveTo(2.34f, 8.36f, 0f, 10.91f, 0f, 14f)
+        curveToRelative(0f, 3.31f, 2.69f, 6f, 6f, 6f)
+        horizontalLineToRelative(13f)
+        curveToRelative(2.76f, 0f, 5f, -2.24f, 5f, -5f)
+        curveToRelative(0f, -2.64f, -2.05f, -4.78f, -4.65f, -4.96f)
+        close()
+    }
+
+    /** Folded map, for the map-style control. */
+    val Map: ImageVector = materialGlyph("Map") {
+        moveTo(20.5f, 3f)
+        lineToRelative(-0.16f, 0.03f)
+        lineTo(15f, 5.1f)
+        lineTo(9f, 3f)
+        lineTo(3.36f, 4.9f)
+        curveTo(3.15f, 4.97f, 3f, 5.15f, 3f, 5.38f)
+        verticalLineTo(20.5f)
+        curveToRelative(0f, 0.28f, 0.22f, 0.5f, 0.5f, 0.5f)
+        lineToRelative(0.16f, -0.03f)
+        lineTo(9f, 18.9f)
+        lineToRelative(6f, 2.1f)
+        lineToRelative(5.64f, -1.9f)
+        curveToRelative(0.21f, -0.07f, 0.36f, -0.25f, 0.36f, -0.48f)
+        verticalLineTo(3.5f)
+        curveTo(21f, 3.22f, 20.78f, 3f, 20.5f, 3f)
+        close()
+        moveTo(15f, 19f)
+        lineTo(9f, 16.89f)
+        verticalLineTo(5f)
+        lineToRelative(6f, 2.11f)
+        verticalLineTo(19f)
+        close()
+    }
+
+    /** Live-tracking ring with a center dot. */
+    val Locate: ImageVector = materialGlyph("Locate", fillType = PathFillType.EvenOdd) {
+        circle(12f, 12f, 9f)
+        circle(12f, 12f, 7.2f)
+        circle(12f, 12f, 3f)
     }
 
     /** Horizontal three-dot "more" glyph. */

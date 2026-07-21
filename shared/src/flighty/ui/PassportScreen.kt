@@ -62,19 +62,39 @@ fun PassportScreen(
                 )
                 .padding(16.dp),
         ) {
-            Text(
-                text = "ALL-TIME FLIGHTY PASSPORT",
-                fontSize = 11.sp,
-                letterSpacing = 1.2.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-            )
-            Text(
-                text = "PASSPORT · PASS · PASAPORTE",
-                fontSize = 9.sp,
-                letterSpacing = 1.sp,
-                color = Color.White.copy(alpha = 0.55f),
-            )
+            Row(verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "ALL-TIME FLIGHTY PASSPORT",
+                        fontSize = 11.sp,
+                        letterSpacing = 1.2.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(width = 8.dp, height = 10.dp)
+                                .background(
+                                    Color.White.copy(alpha = 0.55f),
+                                    RoundedCornerShape(2.dp),
+                                ),
+                        )
+                        Text(
+                            text = " PASSPORT · PASS · PASAPORTE",
+                            fontSize = 9.sp,
+                            letterSpacing = 1.sp,
+                            color = Color.White.copy(alpha = 0.55f),
+                        )
+                    }
+                }
+                Icon(
+                    imageVector = AppIcons.Share,
+                    contentDescription = "Share passport",
+                    tint = Color.White.copy(alpha = 0.85f),
+                    modifier = Modifier.size(15.dp),
+                )
+            }
 
             Spacer(Modifier.height(14.dp))
             Row {
@@ -89,18 +109,25 @@ fun PassportScreen(
             }
 
             Spacer(Modifier.height(14.dp))
-            Box(
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color.White.copy(alpha = 0.16f), RoundedCornerShape(10.dp))
-                    .padding(vertical = 9.dp),
-                contentAlignment = Alignment.Center,
+                    .padding(horizontal = 12.dp, vertical = 9.dp),
             ) {
                 Text(
-                    text = "All Flight Stats  ›",
+                    text = "All Flight Stats",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Color.White,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "›",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White.copy(alpha = 0.9f),
                 )
             }
         }
@@ -119,7 +146,7 @@ fun PassportScreen(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "${stats.monthFlights}",
-                    fontSize = 44.sp,
+                    fontSize = 48.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                 )

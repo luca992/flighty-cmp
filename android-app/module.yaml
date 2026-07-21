@@ -17,8 +17,12 @@ settings:
     namespace: com.flighty.app
     signing: enabled
     resourcePackaging:
-      # AGP 9.2 rejects the stray META-INF version markers that ship in some
-      # KMP compose artifacts during MergeJavaRes.
+      # AGP 9.2 rejects stray META-INF files that ship in some KMP artifacts
+      # during MergeJavaRes: version markers from compose, and the per-library
+      # LICENSE.txt files bundled by the JetBrains lifecycle 2.11 artifacts.
       excludes:
         - META-INF/*.version
+        - META-INF/org/jetbrains/**
+        - META-INF/LICENSE*
+        - META-INF/NOTICE*
 
