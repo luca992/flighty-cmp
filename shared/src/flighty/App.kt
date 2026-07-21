@@ -107,7 +107,12 @@ fun App() {
                 )
             }
 
-            val sheetState = rememberBottomSheetState(initialValue = SheetValue.PartiallyExpanded)
+            val sheetState = rememberBottomSheetState(
+                initialValue = SheetValue.PartiallyExpanded,
+                // No Hidden: the sheet is structural chrome and must never be
+                // dismissable (the new API's default enabledValues includes it).
+                enabledValues = setOf(SheetValue.PartiallyExpanded, SheetValue.Expanded),
+            )
             val scaffoldState = rememberBottomSheetScaffoldState(bottomSheetState = sheetState)
             val scope = rememberCoroutineScope()
 
