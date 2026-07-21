@@ -102,10 +102,13 @@ native `MapLibre.framework` — which the Kotlin Toolchain doesn't support yet. 
 it manually:
 
 1. `scripts/fetch-maplibre-ios.sh` downloads the official `MapLibre.dynamic.xcframework` (6.25.1)
-   into `ios-app/Frameworks/` (gitignored).
+   into `ios-app/Frameworks/` (gitignored) and rewrites the absolute `-F` linker paths in the
+   module.yaml files to your checkout's location — run it once after cloning (and again if the
+   checkout moves).
 2. `shared/module.yaml` and `ios-app/module.yaml` pass `-linker-option -F<slice> -framework
    MapLibre` to the Kotlin/Native link via `settings@iosArm64` / `settings@iosSimulatorArm64`
-   `freeCompilerArgs` (the paths are absolute — adjust if your checkout moves).
+   `freeCompilerArgs` (absolute paths required — relative paths resolve against varying link-task
+   working directories).
 3. `ios-app/module.xcodeproj` has a hand-added **Embed Frameworks** phase that copies and signs
    the xcframework into the app bundle.
 
