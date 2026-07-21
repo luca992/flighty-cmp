@@ -1,0 +1,37 @@
+product:
+  type: ios/app
+  platforms: [iosArm64, iosSimulatorArm64]
+
+dependencies:
+  - ../shared
+
+settings:
+  kotlin:
+    version: 2.4.0
+  compose:
+    enabled: true
+    version: 1.11.1
+
+# MapLibre Native is an Apple framework distributed via SPM/CocoaPods, which the
+# Kotlin Toolchain can't consume yet. The xcframework is downloaded manually into
+# ios-app/Frameworks/ and linked into the Kotlin framework via raw linker flags;
+# the Xcode project embeds it into the app bundle.
+settings@iosSimulatorArm64:
+  kotlin:
+    freeCompilerArgs:
+      - -linker-option
+      - -F/Users/lucaspinazzola/Projects/flighty-cmp/ios-app/Frameworks/MapLibre.xcframework/ios-arm64_x86_64-simulator
+      - -linker-option
+      - -framework
+      - -linker-option
+      - MapLibre
+
+settings@iosArm64:
+  kotlin:
+    freeCompilerArgs:
+      - -linker-option
+      - -F/Users/lucaspinazzola/Projects/flighty-cmp/ios-app/Frameworks/MapLibre.xcframework/ios-arm64
+      - -linker-option
+      - -framework
+      - -linker-option
+      - MapLibre

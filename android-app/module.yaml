@@ -1,0 +1,18 @@
+product: android/app
+
+dependencies:
+  - ../shared
+  - androidx.activity:activity-compose:1.13.0
+
+settings:
+  kotlin:
+    version: 2.4.0
+  compose:
+    enabled: true
+    version: 1.11.1
+  junit: junit-4
+  android:
+    applicationId: com.flighty.app
+    namespace: com.flighty.app
+    signing: enabled
+
