@@ -290,7 +290,19 @@ struct GlassContentView: View {
     @State private var detailFlightId: String? = nil
 
     var body: some View {
-        TabView(selection: $selectedTab) {
+        // The search tab never actually activates — selecting it just
+        // presents the Add Flight sheet over the current tab, so the map
+        // stays visible behind the sheet instead of a blank page.
+        TabView(selection: Binding(
+            get: { selectedTab },
+            set: { newValue in
+                if newValue == 3 {
+                    showAddFlight = true
+                } else {
+                    selectedTab = newValue
+                }
+            }
+        )) {
             Tab("My Flights", systemImage: "airplane", value: 0) {
                 FlightsTabView(onDetailShown: { id in
                     withAnimation { detailFlightId = id }
@@ -312,15 +324,13 @@ struct GlassContentView: View {
                 PassportTabView().ignoresSafeArea()
             }
             Tab("Search", systemImage: "magnifyingglass", value: 3, role: .search) {
-                // The search tab mirrors Flighty: it presents the Add Flight
-                // sheet rather than owning content of its own.
+                // Never shown: selection is intercepted above.
                 Color.clear
-                    .onAppear { showAddFlight = true }
             }
         }
         .tabBarMinimizeBehavior(.automatic)
         .tint(.blue)
-        .sheet(isPresented: $showAddFlight, onDismiss: { selectedTab = 0 }) {
+        .sheet(isPresented: $showAddFlight) {
             AddFlightView(onDismiss: { showAddFlight = false })
                 .ignoresSafeArea()
                 .presentationDetents([.large])
