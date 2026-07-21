@@ -205,7 +205,6 @@ fun App() {
                                             val state by flightsViewModel.uiState.collectAsState()
                                             FlightsScreen(
                                                 state = state,
-                                                onToggleShowPast = flightsViewModel::setShowPast,
                                                 scrollState = flightsScrollState,
                                                 scrollEnabled = innerScrollEnabled,
                                                 onFlightClick = {

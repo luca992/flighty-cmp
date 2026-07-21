@@ -47,25 +47,18 @@ import flighty.ui.components.StatusText
 @Composable
 fun FlightsScreen(
     state: FlightsUiState,
-    onToggleShowPast: (Boolean) -> Unit,
     scrollState: ScrollState,
     scrollEnabled: Boolean,
     onFlightClick: (Flight) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 18.dp),
-        ) {
-            Text(
-                text = "My Flights",
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-                color = FlightyColors.TextDark,
-                modifier = Modifier.weight(1f),
-            )
-            SegmentedToggle(showPast = state.showPast, onChange = onToggleShowPast)
-        }
+        Text(
+            text = "My Flights",
+            fontSize = 26.sp,
+            fontWeight = FontWeight.Bold,
+            color = FlightyColors.TextDark,
+            modifier = Modifier.padding(start = 20.dp, top = 18.dp),
+        )
         // Scrolling only engages once the sheet is expanded: the per-frame
         // nested-scroll arbitration between an active inner scrollable and the
         // sheet drag is what made sheet gestures stutter on iOS.
@@ -76,64 +69,35 @@ fun FlightsScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             var lastDay: String? = null
-            state.flights.forEach { flight ->
+            state.upcoming.forEach { flight ->
                 if (flight.dayLabel != lastDay) {
                     lastDay = flight.dayLabel
-                    Text(
-                        text = flight.dayLabel,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 1.2.sp,
-                        color = if (flight.dayLabel == "LIVE") FlightyColors.Blue else FlightyColors.TextGray,
-                        modifier = Modifier.padding(start = 8.dp, top = 8.dp),
-                    )
+                    SectionHeader(flight.dayLabel)
                 }
                 FlightCard(flight = flight, onClick = { onFlightClick(flight) })
+            }
+            if (state.past.isNotEmpty()) {
+                SectionHeader("PAST")
+                state.past.forEach { flight ->
+                    FlightCard(flight = flight, onClick = { onFlightClick(flight) })
+                }
             }
         }
     }
 }
 
 @Composable
-private fun SegmentedToggle(
-    showPast: Boolean,
-    onChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .background(FlightyColors.ChipBg, RoundedCornerShape(50))
-            .padding(3.dp),
-    ) {
-        SegmentedButton("Upcoming", selected = !showPast) { onChange(false) }
-        SegmentedButton("Past", selected = showPast) { onChange(true) }
-    }
+private fun SectionHeader(label: String) {
+    Text(
+        text = label,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 1.2.sp,
+        color = if (label == "LIVE") FlightyColors.Blue else FlightyColors.TextGray,
+        modifier = Modifier.padding(start = 8.dp, top = 8.dp),
+    )
 }
 
-@Composable
-private fun SegmentedButton(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .background(
-                if (selected) FlightyColors.CardBg else FlightyColors.ChipBg,
-                RoundedCornerShape(50),
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            fontSize = 13.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (selected) FlightyColors.TextDark else FlightyColors.TextGray,
-        )
-    }
-}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

@@ -1,7 +1,6 @@
 package flighty.vm
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import flighty.data.FlightRepository
 import flighty.model.AddFlightSuggestion
 import flighty.model.Flight
@@ -9,11 +8,7 @@ import flighty.model.Friend
 import flighty.model.TravelStats
 import flighty.platformName
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 
 /**
  * Each screen has one ViewModel exposing a single immutable [StateFlow] of its
@@ -28,35 +23,17 @@ class AppViewModel(private val repository: FlightRepository) : ViewModel() {
 }
 
 data class FlightsUiState(
-    val flights: List<Flight>,
-    val showPast: Boolean,
-    val upcomingCount: Int,
+    val upcoming: List<Flight>,
+    val past: List<Flight>,
 )
 
-class FlightsViewModel(private val repository: FlightRepository) : ViewModel() {
-    private val showPast = MutableStateFlow(false)
-
-    val uiState: StateFlow<FlightsUiState> = showPast
-        .map { past ->
-            FlightsUiState(
-                flights = if (past) repository.pastFlights() else repository.upcomingFlights(),
-                showPast = past,
-                upcomingCount = repository.upcomingFlights().size,
-            )
-        }
-        .stateIn(
-            viewModelScope,
-            SharingStarted.Eagerly,
-            FlightsUiState(
-                flights = repository.upcomingFlights(),
-                showPast = false,
-                upcomingCount = repository.upcomingFlights().size,
-            ),
-        )
-
-    fun setShowPast(showPast: Boolean) {
-        this.showPast.value = showPast
-    }
+class FlightsViewModel(repository: FlightRepository) : ViewModel() {
+    val uiState: StateFlow<FlightsUiState> = MutableStateFlow(
+        FlightsUiState(
+            upcoming = repository.upcomingFlights(),
+            past = repository.pastFlights(),
+        ),
+    )
 }
 
 data class FlightDetailUiState(val flight: Flight?)
