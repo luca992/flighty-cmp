@@ -1,5 +1,9 @@
 package flighty
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -211,9 +215,34 @@ fun App() {
                             // graphics layers, and any transparent region shows
                             // the black Metal backing layer on iOS.
                             modifier = Modifier.background(FlightyColors.SheetBg),
+                            // Alpha-free slides instead of the default 700ms
+                            // cross-fade: on iOS the fading layers composite
+                            // against the black Metal backing and the whole
+                            // sheet flashes dark during navigation.
+                            transitionSpec = {
+                                slideInHorizontally(tween(400)) { it } togetherWith
+                                    slideOutHorizontally(tween(400)) { -it / 3 }
+                            },
+                            popTransitionSpec = {
+                                slideInHorizontally(tween(400)) { -it / 3 } togetherWith
+                                    slideOutHorizontally(tween(400)) { it }
+                            },
+                            predictivePopTransitionSpec = {
+                                slideInHorizontally(tween(400)) { -it / 3 } togetherWith
+                                    slideOutHorizontally(tween(400)) { it }
+                            },
                             onBack = { backStack.removeLastOrNull() },
                             entryProvider = entryProvider {
+                                // Each entry gets an opaque sheet-colored panel:
+                                // the screens themselves have no background, so
+                                // without it the slide layers are transparent
+                                // and the outgoing screen shows through.
                                 entry<AppScreen.Home> {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(FlightyColors.SheetBg),
+                                    ) {
                                     when (tab) {
                                         Tab.Flights -> {
                                             val flightsViewModel =
@@ -252,19 +281,26 @@ fun App() {
                                             )
                                         }
                                     }
+                                    }
                                 }
                                 entry<AppScreen.FlightDetail> { key ->
                                     val detailViewModel = viewModel(key = "detail-${key.flightId}") {
                                         FlightDetailViewModel(AppGraph.flightRepository, key.flightId)
                                     }
                                     val state by detailViewModel.uiState.collectAsState()
-                                    state.flight?.let { flight ->
-                                        FlightDetailScreen(
-                                            flight = flight,
-                                            scrollState = detailScrollState,
-                                            scrollEnabled = innerScrollEnabled,
-                                            onBack = { backStack.removeLastOrNull() },
-                                        )
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(FlightyColors.SheetBg),
+                                    ) {
+                                        state.flight?.let { flight ->
+                                            FlightDetailScreen(
+                                                flight = flight,
+                                                scrollState = detailScrollState,
+                                                scrollEnabled = innerScrollEnabled,
+                                                onBack = { backStack.removeLastOrNull() },
+                                            )
+                                        }
                                     }
                                 }
                             },
