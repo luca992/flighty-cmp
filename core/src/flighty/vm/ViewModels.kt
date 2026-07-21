@@ -5,6 +5,7 @@ import flighty.data.FlightRepository
 import flighty.model.AddFlightSuggestion
 import flighty.model.Flight
 import flighty.model.Friend
+import flighty.model.Profile
 import flighty.model.TravelStats
 import flighty.platformName
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +26,7 @@ class AppViewModel(private val repository: FlightRepository) : ViewModel() {
 data class FlightsUiState(
     val upcoming: List<Flight>,
     val past: List<Flight>,
+    val profile: Profile,
 )
 
 class FlightsViewModel(repository: FlightRepository) : ViewModel() {
@@ -32,6 +34,7 @@ class FlightsViewModel(repository: FlightRepository) : ViewModel() {
         FlightsUiState(
             upcoming = repository.upcomingFlights(),
             past = repository.pastFlights(),
+            profile = repository.profile(),
         ),
     )
 }
@@ -46,18 +49,23 @@ class FlightDetailViewModel(
         MutableStateFlow(FlightDetailUiState(repository.flightById(flightId)))
 }
 
-data class FriendsUiState(val friends: List<Friend>)
+data class FriendsUiState(val friends: List<Friend>, val profile: Profile)
 
 class FriendsViewModel(repository: FlightRepository) : ViewModel() {
     val uiState: StateFlow<FriendsUiState> =
-        MutableStateFlow(FriendsUiState(repository.friends()))
+        MutableStateFlow(FriendsUiState(repository.friends(), repository.profile()))
 }
 
-data class PassportUiState(val stats: TravelStats, val runningOn: String)
+data class PassportUiState(
+    val stats: TravelStats,
+    val runningOn: String,
+    val profile: Profile,
+)
 
 class PassportViewModel(repository: FlightRepository) : ViewModel() {
-    val uiState: StateFlow<PassportUiState> =
-        MutableStateFlow(PassportUiState(repository.travelStats(), platformName()))
+    val uiState: StateFlow<PassportUiState> = MutableStateFlow(
+        PassportUiState(repository.travelStats(), platformName(), repository.profile()),
+    )
 }
 
 data class AddFlightUiState(val suggestions: List<AddFlightSuggestion>)

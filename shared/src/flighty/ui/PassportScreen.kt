@@ -25,13 +25,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import flighty.model.Profile
 import flighty.model.TravelStats
 import flighty.ui.components.AppIcons
+import flighty.ui.components.FlightyChip
+import flighty.ui.components.ScreenHeader
 
 @Composable
 fun PassportScreen(
     stats: TravelStats,
     runningOn: String,
+    profile: Profile,
     scrollState: ScrollState,
     scrollEnabled: Boolean,
 ) {
@@ -41,45 +45,11 @@ fun PassportScreen(
             .verticalScroll(scrollState, enabled = scrollEnabled)
             .padding(horizontal = 16.dp),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(top = 18.dp),
-        ) {
-            Text(
-                text = "Passport",
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-                color = FlightyColors.TextDark,
-                modifier = Modifier.weight(1f),
-            )
-            Icon(
-                imageVector = AppIcons.Share,
-                contentDescription = "Share",
-                tint = FlightyColors.TextDark,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.size(12.dp))
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .background(
-                        Brush.linearGradient(listOf(FlightyColors.Blue, Color(0xFF7C4DE0))),
-                        CircleShape,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "FF",
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-        }
+        ScreenHeader(title = "Passport", profile = profile, modifier = Modifier.padding(start = 4.dp, top = 18.dp))
 
         Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip("All-Time", selected = true)
-            FilterChip("2026", selected = false)
+            FlightyChip("All-Time", selected = true)
+            FlightyChip("2026", selected = false)
         }
 
         Spacer(Modifier.height(14.dp))
@@ -175,22 +145,6 @@ fun PassportScreen(
             modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 96.dp),
         )
     }
-}
-
-@Composable
-private fun FilterChip(label: String, selected: Boolean) {
-    Text(
-        text = label,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.SemiBold,
-        color = if (selected) Color.White else FlightyColors.TextGray,
-        modifier = Modifier
-            .background(
-                if (selected) FlightyColors.TextDark else FlightyColors.ChipBg,
-                RoundedCornerShape(50),
-            )
-            .padding(horizontal = 12.dp, vertical = 5.dp),
-    )
 }
 
 @Composable

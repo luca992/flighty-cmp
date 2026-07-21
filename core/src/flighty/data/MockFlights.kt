@@ -7,6 +7,7 @@ import flighty.model.DelayForecast
 import flighty.model.Flight
 import flighty.model.FlightStatus
 import flighty.model.Friend
+import flighty.model.Profile
 import flighty.model.TravelStats
 
 object Airlines {
@@ -197,6 +198,8 @@ object MockFlights {
         Friend("Priya Patel", "PP", 0xFFE0722F, "AC 848", "YYZ → LHR", FlightStatus.Landed, "Landed 2:14 PM"),
         Friend("Tom Okafor", "TO", 0xFFD14B8F, "WS 3410", "YOW → YYZ", FlightStatus.Delayed, "Now departs 8:05 PM"),
     )
+
+    val profile = Profile(name = "Luca Spinazzola", initials = "LS")
 
     val stats = TravelStats(
         flights = 7,

@@ -3,6 +3,7 @@ package flighty.data
 import flighty.model.AddFlightSuggestion
 import flighty.model.Flight
 import flighty.model.Friend
+import flighty.model.Profile
 import flighty.model.TravelStats
 
 /**
@@ -17,6 +18,7 @@ interface FlightRepository {
     fun friends(): List<Friend>
     fun travelStats(): TravelStats
     fun addFlightSuggestions(): List<AddFlightSuggestion>
+    fun profile(): Profile
 }
 
 class MockFlightRepository : FlightRepository {
@@ -27,6 +29,7 @@ class MockFlightRepository : FlightRepository {
     override fun friends(): List<Friend> = MockFlights.friends
     override fun travelStats(): TravelStats = MockFlights.stats
     override fun addFlightSuggestions(): List<AddFlightSuggestion> = MockFlights.addFlightSuggestions
+    override fun profile(): Profile = MockFlights.profile
 }
 
 /**

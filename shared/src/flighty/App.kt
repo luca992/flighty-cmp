@@ -1,7 +1,5 @@
 package flighty
 
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -98,14 +96,17 @@ fun App() {
             val screenHeight = maxHeight
             val peekHeight = if (detailFlight != null) screenHeight * 0.55f else screenHeight * 0.66f
 
-            // Globe ↔ real map handoff crossfades like the reference video.
-            Crossfade(targetState = detailFlight, animationSpec = tween(700)) { flight ->
-                MapBackdrop(
-                    flight = flight ?: if (tab == Tab.Flights) appViewModel.liveFlight else null,
-                    detail = flight != null,
-                    mapHeightFraction = if (flight != null) 0.45f else 0.34f,
-                )
-            }
+            // Globe ↔ real map handoff switches instantly: the MapLibre map is
+            // a native interop view, and Compose cannot alpha-composite interop
+            // layers — crossfading it painted the whole backdrop black on iOS
+            // for the duration of the fade. The map's own camera fly-in
+            // animation carries the transition instead.
+            MapBackdrop(
+                flight = detailFlight
+                    ?: if (tab == Tab.Flights) appViewModel.liveFlight else null,
+                detail = detailFlight != null,
+                mapHeightFraction = if (detailFlight != null) 0.45f else 0.34f,
+            )
 
             val sheetState = rememberBottomSheetState(
                 initialValue = SheetValue.PartiallyExpanded,
@@ -195,6 +196,10 @@ fun App() {
 
                         NavDisplay(
                             backStack = backStack,
+                            // Opaque backing: nav transitions render entries into
+                            // graphics layers, and any transparent region shows
+                            // the black Metal backing layer on iOS.
+                            modifier = Modifier.background(FlightyColors.SheetBg),
                             onBack = { backStack.removeLastOrNull() },
                             entryProvider = entryProvider {
                                 entry<AppScreen.Home> {
@@ -218,6 +223,7 @@ fun App() {
                                             val state by friendsViewModel.uiState.collectAsState()
                                             FriendsScreen(
                                                 friends = state.friends,
+                                                profile = state.profile,
                                                 scrollState = friendsScrollState,
                                                 scrollEnabled = innerScrollEnabled,
                                             )
@@ -229,6 +235,7 @@ fun App() {
                                             PassportScreen(
                                                 stats = state.stats,
                                                 runningOn = state.runningOn,
+                                                profile = state.profile,
                                                 scrollState = passportScrollState,
                                                 scrollEnabled = innerScrollEnabled,
                                             )

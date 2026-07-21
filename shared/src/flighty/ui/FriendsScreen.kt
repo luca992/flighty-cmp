@@ -24,22 +24,40 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import flighty.model.Friend
+import flighty.model.Profile
+import flighty.ui.components.FlightyChip
+import flighty.ui.components.ScreenHeader
 import flighty.ui.components.StatusText
 
 @Composable
 fun FriendsScreen(
     friends: List<Friend>,
+    profile: Profile,
     scrollState: ScrollState,
     scrollEnabled: Boolean,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            text = "Friends",
-            fontSize = 26.sp,
-            fontWeight = FontWeight.Bold,
-            color = FlightyColors.TextDark,
-            modifier = Modifier.padding(start = 20.dp, top = 18.dp),
+        ScreenHeader(
+            title = "Friends",
+            profile = profile,
+            showMore = true,
+            modifier = Modifier.padding(start = 20.dp, end = 16.dp, top = 18.dp),
         )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(start = 20.dp, top = 12.dp),
+        ) {
+            FlightyChip("Everyone", selected = true)
+            FlightyChip("Today", selected = false)
+            Text(
+                text = "+ Add Friend",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = FlightyColors.Blue,
+                modifier = Modifier.padding(start = 4.dp),
+            )
+        }
         Column(
             modifier = Modifier
                 .verticalScroll(scrollState, enabled = scrollEnabled)

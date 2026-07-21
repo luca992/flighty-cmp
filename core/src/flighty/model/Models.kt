@@ -97,6 +97,12 @@ data class Friend(
     val statusNote: String,
 )
 
+/** The signed-in traveler shown in screen headers and the avatar menu. */
+data class Profile(
+    val name: String,
+    val initials: String,
+)
+
 /** A row in the Add Flight sheet's "Frequently Used" section. */
 data class AddFlightSuggestion(
     val badgeCode: String,

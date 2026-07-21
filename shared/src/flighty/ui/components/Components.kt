@@ -197,6 +197,47 @@ object AppIcons {
         reflectiveCurveToRelative(-1.31f, -2.92f, -2.92f, -2.92f)
         close()
     }
+
+    /** Horizontal three-dot "more" glyph. */
+    val More: ImageVector = materialGlyph("More") {
+        for (cx in listOf(5f, 12f, 19f)) circle(cx, 12f, 2f)
+    }
+
+    /** Tune-style sliders glyph standing in for the settings gear. */
+    val Settings: ImageVector = materialGlyph("Settings") {
+        for ((y, knobX) in listOf(5f to 8f, 12f to 16f, 19f to 10f)) {
+            moveTo(3f, y - 1f)
+            horizontalLineTo(21f)
+            verticalLineTo(y + 1f)
+            horizontalLineTo(3f)
+            close()
+            circle(knobX, y, 2.6f)
+        }
+    }
+}
+
+private fun PathBuilder.circle(cx: Float, cy: Float, r: Float) {
+    moveTo(cx - r, cy)
+    arcToRelative(r, r, 0f, isMoreThanHalf = true, isPositiveArc = false, dx1 = 2 * r, dy1 = 0f)
+    arcToRelative(r, r, 0f, isMoreThanHalf = true, isPositiveArc = false, dx1 = -2 * r, dy1 = 0f)
+    close()
+}
+
+/** Small rounded filter chip used on the Passport and Friends headers. */
+@Composable
+fun FlightyChip(label: String, selected: Boolean, modifier: Modifier = Modifier) {
+    Text(
+        text = label,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = if (selected) Color.White else FlightyColors.TextGray,
+        modifier = modifier
+            .background(
+                if (selected) FlightyColors.TextDark else FlightyColors.ChipBg,
+                RoundedCornerShape(50),
+            )
+            .padding(horizontal = 12.dp, vertical = 5.dp),
+    )
 }
 
 @Composable

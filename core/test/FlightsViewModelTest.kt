@@ -16,6 +16,7 @@ class FlightsViewModelTest {
         val state = viewModel.uiState.value
         assertEquals(repository.upcomingFlights(), state.upcoming)
         assertEquals(repository.pastFlights(), state.past)
+        assertEquals(repository.profile(), state.profile)
         assertTrue(state.upcoming.none { it.isPast })
         assertTrue(state.past.all { it.isPast })
     }
