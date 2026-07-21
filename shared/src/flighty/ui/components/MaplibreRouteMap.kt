@@ -1,7 +1,5 @@
 package flighty.ui.components
 
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,10 +9,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
@@ -78,7 +73,6 @@ fun MaplibreRouteMap(
                 zoom = (targetZoom - 2.6).coerceAtLeast(0.3),
             ),
         )
-        var cameraSettled by remember(flight.id) { mutableStateOf(false) }
         LaunchedEffect(flight.id) {
             // The backdrop already defers mounting this map until the entrance
             // animation settles; this small extra beat gives the surface/style
@@ -91,7 +85,6 @@ fun MaplibreRouteMap(
                 ),
                 duration = 1200.milliseconds,
             )
-            cameraSettled = true
         }
         MaplibreMap(
             modifier = Modifier
@@ -111,38 +104,36 @@ fun MaplibreRouteMap(
         // It appears only after the fly-in settles, so the overlay never has to
         // chase the animating camera; afterwards it re-places itself in the
         // layout placement phase (the offset lambda) as the user pans.
-        androidx.compose.animation.AnimatedVisibility(
-            visible = cameraSettled,
-            enter = fadeIn(tween(350)),
-        ) {
-            val plane = remember(flight.id) { planePosition(flight, route) }
-            val bearing = remember(flight.id) { routeBearing(flight, route) }
-            val planePainter = rememberVectorPainter(AppIcons.Plane)
-            Spacer(
-                modifier = Modifier
-                    .offset {
-                        camera.position
-                        val loc = camera.projection?.screenLocationFromPosition(
-                            Position(longitude = plane.first, latitude = plane.second),
-                        ) ?: DpOffset(x = (-100).dp, y = (-100).dp)
-                        IntOffset((loc.x - 13.dp).roundToPx(), (loc.y - 13.dp).roundToPx())
-                    }
-                    .size(26.dp)
-                    .drawBehind {
-                        rotate(degrees = bearing) {
-                            val outline = ColorFilter.tint(Color(0xCC1A2433))
-                            for ((ox, oy) in listOf(-1f to 0f, 1f to 0f, 0f to -1f, 0f to 1f)) {
-                                translate(left = ox.dp.toPx(), top = oy.dp.toPx()) {
-                                    with(planePainter) { draw(size, colorFilter = outline) }
-                                }
-                            }
-                            with(planePainter) {
-                                draw(size, colorFilter = ColorFilter.tint(Color.White))
+        // Visible from the first frame: the offset lambda reads the camera in
+        // the placement phase, so the icon rides the route through the fly-in
+        // without forcing recomposition.
+        val plane = remember(flight.id) { planePosition(flight, route) }
+        val bearing = remember(flight.id) { routeBearing(flight, route) }
+        val planePainter = rememberVectorPainter(AppIcons.Plane)
+        Spacer(
+            modifier = Modifier
+                .offset {
+                    camera.position
+                    val loc = camera.projection?.screenLocationFromPosition(
+                        Position(longitude = plane.first, latitude = plane.second),
+                    ) ?: DpOffset(x = (-100).dp, y = (-100).dp)
+                    IntOffset((loc.x - 13.dp).roundToPx(), (loc.y - 13.dp).roundToPx())
+                }
+                .size(26.dp)
+                .drawBehind {
+                    rotate(degrees = bearing) {
+                        val outline = ColorFilter.tint(Color(0xCC1A2433))
+                        for ((ox, oy) in listOf(-1f to 0f, 1f to 0f, 0f to -1f, 0f to 1f)) {
+                            translate(left = ox.dp.toPx(), top = oy.dp.toPx()) {
+                                with(planePainter) { draw(size, colorFilter = outline) }
                             }
                         }
-                    },
-            )
-        }
+                        with(planePainter) {
+                            draw(size, colorFilter = ColorFilter.tint(Color.White))
+                        }
+                    }
+                },
+        )
     }
 }
 
