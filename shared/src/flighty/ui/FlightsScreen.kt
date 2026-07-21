@@ -18,12 +18,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
@@ -37,6 +40,7 @@ import flighty.platformName
 import flighty.ui.components.AirlineBadge
 import flighty.ui.components.AppIcons
 import flighty.ui.components.FlightContextMenu
+import flighty.ui.components.LocalNativeFlightMenuHost
 import flighty.ui.components.ScreenHeader
 import flighty.vm.FlightsUiState
 
@@ -73,10 +77,29 @@ fun FlightsScreen(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FlightRow(flight: Flight, onClick: () -> Unit) {
-    var showMenu by remember { mutableStateOf(false) }
-    Box {
-        FlightContextMenu(flight = flight, expanded = showMenu, onDismiss = { showMenu = false })
-        FlightRowBody(flight = flight, onClick = onClick, onLongClick = { showMenu = true })
+    val nativeMenuHost = LocalNativeFlightMenuHost.current
+    if (nativeMenuHost != null) {
+        // A native host owns the long-press: report where this row sits so its
+        // system context-menu interaction can hit-test and snapshot the row.
+        DisposableEffect(flight.id) {
+            onDispose { nativeMenuHost.removeRow(flight.id) }
+        }
+        Box(
+            modifier = Modifier.onGloballyPositioned { coords ->
+                val bounds = coords.boundsInWindow()
+                nativeMenuHost.updateRowBounds(
+                    flight, bounds.left, bounds.top, bounds.right, bounds.bottom,
+                )
+            },
+        ) {
+            FlightRowBody(flight = flight, onClick = onClick, onLongClick = {})
+        }
+    } else {
+        var showMenu by remember { mutableStateOf(false) }
+        Box {
+            FlightContextMenu(flight = flight, expanded = showMenu, onDismiss = { showMenu = false })
+            FlightRowBody(flight = flight, onClick = onClick, onLongClick = { showMenu = true })
+        }
     }
 }
 

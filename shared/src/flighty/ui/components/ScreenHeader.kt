@@ -16,12 +16,15 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -74,6 +77,25 @@ fun ScreenHeader(
 
 @Composable
 private fun ProfileAvatar(profile: Profile) {
+    val nativeHost = LocalNativeProfileMenuHost.current
+    if (nativeHost != null) {
+        // A native host owns the account menu: report where the avatar sits
+        // so its invisible system-menu button can cover it.
+        DisposableEffect(Unit) {
+            onDispose { nativeHost.clearAvatar() }
+        }
+        Avatar(
+            profile = profile,
+            size = 34,
+            modifier = Modifier.onGloballyPositioned { coords ->
+                val bounds = coords.boundsInWindow()
+                nativeHost.updateAvatarBounds(
+                    bounds.left, bounds.top, bounds.right, bounds.bottom,
+                )
+            },
+        )
+        return
+    }
     var menuOpen by remember { mutableStateOf(false) }
     Box {
         Avatar(profile, size = 34, modifier = Modifier.clickable { menuOpen = true })
