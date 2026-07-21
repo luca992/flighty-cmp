@@ -345,6 +345,10 @@ struct GlassContentView: View {
         }
         .tabBarMinimizeBehavior(.automatic)
         .tint(.blue)
+        // The hosting layer must never show systemBackground white: during
+        // sheet presentation there is one frame where both Compose canvases
+        // are blank and whatever is behind them fills the screen.
+        .background(Color(red: 0.016, green: 0.024, blue: 0.047).ignoresSafeArea())
         .sheet(isPresented: $showAddFlight) {
             AddFlightView(onDismiss: { showAddFlight = false })
                 .ignoresSafeArea()
@@ -368,6 +372,14 @@ struct RootView: View {
 
 @main
 struct GlassApp: App {
+    init() {
+        // Same reason as the TabView background: the window itself is the
+        // last fallback layer during presentation transitions.
+        UIWindow.appearance().backgroundColor = UIColor(
+            red: 0.016, green: 0.024, blue: 0.047, alpha: 1
+        )
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

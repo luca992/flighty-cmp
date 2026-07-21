@@ -95,6 +95,10 @@ fun FlightyShell(
         // so drive the sheet from those: scroll up into the content
         // expands it, scroll down at the top collapses it. Desktop-only —
         // touch platforms must not pay for this in the drag hot path.
+        // No settled-state (current == target) guards here: an interrupted
+        // expand animation leaves current/target diverged, and requiring them
+        // to match made every branch dead — wheel input just vanished and the
+        // sheet was stuck. Re-issuing expand/partialExpand is safe.
         val wheelSheetModifier = if (platformName() != "Desktop JVM") Modifier
         else Modifier.pointerInput(Unit) {
             awaitPointerEventScope {
@@ -104,13 +108,12 @@ fun FlightyShell(
                     val dy = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
                     if (dy < -0.2f &&
                         contentAtTop() &&
-                        sheetState.currentValue == SheetValue.Expanded &&
-                        sheetState.targetValue == SheetValue.Expanded
+                        sheetState.currentValue == SheetValue.Expanded
                     ) {
                         scope.launch { sheetState.partialExpand() }
                     } else if (dy > 0.2f &&
                         sheetState.currentValue == SheetValue.PartiallyExpanded &&
-                        sheetState.targetValue == SheetValue.PartiallyExpanded
+                        sheetState.targetValue != SheetValue.Expanded
                     ) {
                         scope.launch { sheetState.expand() }
                     }
@@ -144,10 +147,17 @@ fun FlightyShell(
                 ) {
                     // Inner scrolling engages only once the sheet is fully
                     // expanded: at peek, gestures are pure sheet drags.
-                    // Gate on the SETTLED value only — flipping mid-gesture
-                    // recomposes the scrollable out of the nested-scroll
-                    // chain and makes collapse flings jump.
-                    sheetContent(sheetState.currentValue == SheetValue.Expanded)
+                    // On touch platforms, gate on the SETTLED value only —
+                    // flipping mid-gesture recomposes the scrollable out of
+                    // the nested-scroll chain and makes collapse flings jump.
+                    // Desktop has no drags, so it also accepts the target
+                    // value: with the settled-only gate, a sheet whose expand
+                    // animation was interrupted never re-enabled scrolling.
+                    val innerScrollEnabled =
+                        sheetState.currentValue == SheetValue.Expanded ||
+                            (platformName() == "Desktop JVM" &&
+                                sheetState.targetValue == SheetValue.Expanded)
+                    sheetContent(innerScrollEnabled)
                 }
             },
         ) { /* Map area — the backdrop behind the scaffold shows through. */ }
