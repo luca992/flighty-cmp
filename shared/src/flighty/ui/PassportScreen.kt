@@ -45,7 +45,7 @@ fun PassportScreen(
             .verticalScroll(scrollState, enabled = scrollEnabled)
             .padding(horizontal = 16.dp),
     ) {
-        ScreenHeader(title = "Passport", profile = profile, modifier = Modifier.padding(start = 4.dp, top = 18.dp))
+        ScreenHeader(title = "Passport", profile = profile, modifier = Modifier.padding(start = 4.dp, top = 6.dp))
 
         Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FlightyChip("All-Time", selected = true)

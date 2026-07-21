@@ -41,7 +41,7 @@ fun FriendsScreen(
             title = "Friends",
             profile = profile,
             showMore = true,
-            modifier = Modifier.padding(start = 20.dp, end = 16.dp, top = 18.dp),
+            modifier = Modifier.padding(start = 20.dp, end = 16.dp, top = 6.dp),
         )
         Row(
             verticalAlignment = Alignment.CenterVertically,

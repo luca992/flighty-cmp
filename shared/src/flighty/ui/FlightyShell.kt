@@ -130,7 +130,7 @@ fun FlightyShell(
             sheetDragHandle = {
                 Box(
                     modifier = Modifier
-                        .padding(top = 10.dp, bottom = 2.dp)
+                        .padding(top = 8.dp)
                         .size(width = 36.dp, height = 4.dp)
                         .background(FlightyColors.Divider, RoundedCornerShape(50)),
                 )

@@ -15,13 +15,11 @@ enum ProfileMenu {
         let button = UIButton(type: .custom)
         button.showsMenuAsPrimaryAction = true
         button.menu = UIMenu(children: [
-            UIMenu(options: .displayInline, children: [
-                UIAction(
-                    title: GlassControllersKt.profileDisplayName(),
-                    subtitle: "Edit Profile",
-                    image: UIImage(systemName: "person.crop.circle")
-                ) { _ in },
-            ]),
+            UIAction(
+                title: GlassControllersKt.profileDisplayName(),
+                subtitle: "Edit Profile",
+                image: UIImage(systemName: "person.crop.circle")
+            ) { _ in },
             UIAction(title: "Manage Friends", image: UIImage(systemName: "person.2")) { _ in },
             UIAction(title: "Settings", image: UIImage(systemName: "gearshape")) { _ in },
         ])

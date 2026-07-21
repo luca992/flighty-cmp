@@ -63,7 +63,7 @@ fun FlightDetailScreen(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
         ) {
             AirlineBadge(flight.airline, size = 24)
             Text(
