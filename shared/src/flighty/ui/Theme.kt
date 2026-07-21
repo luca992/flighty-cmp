@@ -70,12 +70,6 @@ val FlightStatus.label: String
 @Composable
 fun FlightyTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        // Standard (non-bouncy) motion: the default "expressive" scheme's
-        // spatial spring overshoots the sheet past its anchors, which both
-        // renders jerkily on iOS and feeds the M3 1.4 sheet bounce-loop
-        // regressions (google issues 467297218, 486562294). Verified: the
-        // pre-1.4 M3 line (no expressive motion) has neither problem.
-        motionScheme = MotionScheme.standard(),
         colorScheme = lightColorScheme(
             primary = FlightyColors.Blue,
             onPrimary = Color.White,
