@@ -37,10 +37,17 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.vector.VectorPainter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.resources.imageResource
+import shared.generated.resources.Res
+import shared.generated.resources.earth_tex
 import flighty.model.Flight
 import flighty.model.FlightStatus
 import flighty.ui.FlightyColors
@@ -58,8 +65,8 @@ internal class GlobeView(
     val centerX: Float,
     val centerY: Float,
     val radius: Float,
-    centerLonDeg: Double,
-    centerLatDeg: Double,
+    val centerLonDeg: Double,
+    val centerLatDeg: Double,
 ) {
     private val lam0 = centerLonDeg * PI / 180
     private val phi0 = centerLatDeg * PI / 180
@@ -130,9 +137,16 @@ private class GlobeGeometry(
  * render-node caching, so without this every sheet-drag frame would re-fill the
  * 3.5k-point coastline path; with it, each frame is a single texture blit.
  */
+private class EarthTexture(val pixels: IntArray, val width: Int, val height: Int)
+
 private class GlobeBitmapCache {
     var key: Float = Float.NaN
     var bitmap: ImageBitmap? = null
+
+    // Textured-sphere layer, rendered at half resolution and upscaled.
+    var warp: GlobeWarp? = null
+    var sphere: ImageBitmap? = null
+    var sphereBuf: IntArray? = null
 }
 
 private fun buildGlobeGeometry(
@@ -306,6 +320,22 @@ fun SpaceBackdrop(
         val cache = remember(flight?.id, widthPx, cropPx) { GlobeBitmapCache() }
         val planePainter = rememberVectorPainter(AppIcons.Plane)
 
+        // NASA Blue Marble (public domain), pre-darkened for the space look.
+        // Copied once into a tight IntArray for the warp sampler.
+        val earthImage = imageResource(Res.drawable.earth_tex)
+        val earthTex = remember(earthImage) {
+            val map = earthImage.toPixelMap()
+            val w = map.width
+            val h = map.height
+            val buf = IntArray(w * h)
+            for (y in 0 until h) {
+                for (x in 0 until w) {
+                    buf[y * w + x] = map[x, y].toArgb()
+                }
+            }
+            EarthTexture(buf, w, h)
+        }
+
         Canvas(modifier = Modifier.fillMaxWidth().height(cropDp)) {
             // Read the animation here (draw phase) so spinning never recomposes;
             // quantize the spin so the cached raster is reused across frames.
@@ -319,10 +349,28 @@ fun SpaceBackdrop(
                 // Geometry is projected in full-screen space; drawing into the
                 // cropped bitmap simply clips everything below the map band.
                 val geo = buildGlobeGeometry(flight, route, widthPx, heightPx, lonOffset)
+
+                // Warp the earth texture onto the sphere at half resolution.
+                // The warp table is spin-independent (spin is a pure column
+                // shift in the texture), so it's built once per size.
+                val w2 = (w + 1) / 2
+                val h2 = (h + 1) / 2
+                var warp = cache.warp
+                if (warp == null || warp.width != w2 || warp.height != h2) {
+                    warp = buildGlobeWarp(geo.view, w2, h2, 2f, earthTex.width, earthTex.height)
+                    cache.warp = warp
+                    cache.sphereBuf = IntArray(w2 * h2)
+                    cache.sphere = ImageBitmap(w2, h2)
+                }
+                val sphereBuf = cache.sphereBuf!!
+                val sphere = cache.sphere!!
+                sampleGlobe(warp, earthTex.pixels, earthTex.width, geo.view.centerLonDeg, sphereBuf)
+                sphere.writePixels(sphereBuf, w2, h2)
+
                 val target = bitmap?.takeIf { it.width == w && it.height == h } ?: ImageBitmap(w, h)
                 CanvasDrawScope().draw(this, layoutDirection, GraphicsCanvas(target), Size(size.width, size.height)) {
                     drawRect(FlightyColors.Space)
-                    drawGlobe(geo, stars, planePainter)
+                    drawGlobe(geo, stars, planePainter, sphere)
                 }
                 bitmap = target
                 cache.bitmap = target
@@ -364,6 +412,7 @@ private fun DrawScope.drawGlobe(
     geo: GlobeGeometry,
     stars: List<Star>,
     planePainter: VectorPainter,
+    sphere: ImageBitmap? = null,
 ) {
     val cx = geo.view.centerX
     val cy = geo.view.centerY
@@ -395,16 +444,44 @@ private fun DrawScope.drawGlobe(
         center = Offset(cx, cy),
     )
 
-    clipPath(geo.disk) {
-        drawPath(geo.graticule, Color(0xFF31497F).copy(alpha = 0.35f), style = Stroke(1f))
-        drawPath(geo.land, Color(0xFF27466F))
-        drawPath(geo.land, Color(0xFF46709F).copy(alpha = 0.85f), style = Stroke(1.2f))
-        for (light in geo.cityLights) {
-            drawCircle(
-                FlightyColors.CityLight.copy(alpha = light.alpha),
-                light.r,
-                Offset(light.x, light.y),
+    if (sphere != null) {
+        // Real earth imagery, warped onto the sphere. The disk clip keeps the
+        // circular edge crisp despite the half-resolution upscale, and a limb
+        // shading pass restores the sphere's depth over the flat texture.
+        clipPath(geo.disk) {
+            drawImage(
+                image = sphere,
+                srcOffset = IntOffset.Zero,
+                srcSize = IntSize(sphere.width, sphere.height),
+                dstOffset = IntOffset.Zero,
+                dstSize = IntSize(size.width.toInt(), size.height.toInt()),
             )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colorStops = arrayOf(
+                        0.0f to Color.Transparent,
+                        0.72f to Color.Transparent,
+                        1.0f to Color(0xB3040A18),
+                    ),
+                    center = Offset(cx, cy - r * 0.55f),
+                    radius = r * 1.65f,
+                ),
+                radius = r,
+                center = Offset(cx, cy),
+            )
+        }
+    } else {
+        clipPath(geo.disk) {
+            drawPath(geo.graticule, Color(0xFF31497F).copy(alpha = 0.35f), style = Stroke(1f))
+            drawPath(geo.land, Color(0xFF27466F))
+            drawPath(geo.land, Color(0xFF46709F).copy(alpha = 0.85f), style = Stroke(1.2f))
+            for (light in geo.cityLights) {
+                drawCircle(
+                    FlightyColors.CityLight.copy(alpha = light.alpha),
+                    light.r,
+                    Offset(light.x, light.y),
+                )
+            }
         }
     }
 

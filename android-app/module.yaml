@@ -22,7 +22,10 @@ settings:
       # LICENSE.txt files bundled by the JetBrains lifecycle 2.11 artifacts.
       excludes:
         - META-INF/*.version
+        # Per-library LICENSE/NOTICE files nested under META-INF (jetbrains
+        # and androidx artifacts both ship them).
         - META-INF/org/jetbrains/**
+        - META-INF/androidx/**
         - META-INF/LICENSE*
         - META-INF/NOTICE*
 
