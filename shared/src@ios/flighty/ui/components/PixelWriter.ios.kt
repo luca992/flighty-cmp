@@ -24,6 +24,6 @@ internal actual fun ImageBitmap.writePixels(pixels: IntArray, width: Int, height
     asSkiaBitmap().installPixels(
         ImageInfo(width, height, ColorType.BGRA_8888, ColorAlphaType.PREMUL),
         bytes,
-        width * 4L,
+        width * 4,
     )
 }
