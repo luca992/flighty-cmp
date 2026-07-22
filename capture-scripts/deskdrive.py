@@ -76,7 +76,7 @@ class App:
         if dist < 3:
             return
         if dur is None:
-            dur = min(0.55, 0.18 + dist / 1800.0)
+            dur = min(0.22, 0.10 + dist / 3000.0)
         # perpendicular bow for a natural arc
         bow = min(40.0, dist * 0.12)
         px, py = -dy / dist * bow, dx / dist * bow
