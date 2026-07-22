@@ -10,15 +10,10 @@ earth-from-space map backdrop with a light sheet floating over it.
 
 ## Demo
 
-All four apps — the Liquid Glass iOS app (native SwiftUI chrome), the full-Compose iOS app,
-Android, and desktop — running the same scripted walkthrough side by side:
+[![Four-platform walkthrough](demo-captures/composite.gif)](demo-captures/composite.mp4)
 
-https://github.com/luca992/flighty-cmp/raw/main/demo-captures/composite.mp4
-
-[![Four-platform walkthrough](demo-captures/poster.png)](demo-captures/composite.mp4)
-
-Per-platform captures live in [`demo-captures/`](demo-captures), and the scripts that
-recorded them (adb / idb / Quartz automation) in [`capture-scripts/`](capture-scripts).
+[Full quality](demo-captures/composite.mp4) · per-platform captures in
+[`demo-captures/`](demo-captures) · recording scripts in [`capture-scripts/`](capture-scripts)
 
 ## What's in the app
 
