@@ -8,6 +8,18 @@ Inspired by [this demo](https://x.com/nater02/status/2079180521427308791) of Fli
 Expo — this is the Kotlin Multiplatform take on the same idea, styled after the real app: a dark
 earth-from-space map backdrop with a light sheet floating over it.
 
+## Demo
+
+All four apps — the Liquid Glass iOS app (native SwiftUI chrome), the full-Compose iOS app,
+Android, and desktop — running the same scripted walkthrough side by side:
+
+https://github.com/luca992/flighty-cmp/raw/main/demo-captures/composite.mp4
+
+[![Four-platform walkthrough](demo-captures/poster.png)](demo-captures/composite.mp4)
+
+Per-platform captures live in [`demo-captures/`](demo-captures), and the scripts that
+recorded them (adb / idb / Quartz automation) in [`capture-scripts/`](capture-scripts).
+
 ## What's in the app
 
 - **Space-map backdrop** (every screen) — star field, glowing planet horizon, city lights, and the
