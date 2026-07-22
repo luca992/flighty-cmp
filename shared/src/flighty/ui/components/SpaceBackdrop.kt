@@ -11,14 +11,10 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -148,8 +144,17 @@ private class EarthTexture(val pixels: IntArray, val width: Int, val height: Int
 /** A produced sphere raster tagged with the spin angle it was sampled at. */
 private class SphereFrame(val bitmap: ImageBitmap, val spinDeg: Float)
 
-/** Extra sampled margin (screen px) left of the canvas; see the producer. */
-private const val GLOBE_OVERSCAN_PX = 8f
+/**
+ * Extra sampled margin (screen px) left of the canvas; see the producer.
+ * Sized for ~1.8s of producer lag (1.5°/s drift · ~15px/°): the draw-phase
+ * slide must never hit this ceiling, because clamping breaks the continuity
+ * between consecutive keyframes and the globe visibly snaps.
+ */
+private const val GLOBE_OVERSCAN_PX = 40f
+
+/** One revolution per 240 s — the reference's 1.5°/s idle drift. */
+private const val SPIN_PERIOD_NS = 240_000_000_000L
+private const val SPIN_DEG_PER_NS = 360.0 / SPIN_PERIOD_NS
 
 private fun buildGlobeGeometry(
     flight: Flight?,
@@ -342,21 +347,39 @@ fun SpaceBackdrop(
         // the <1px residual at the limb hides under the limb shading). One
         // clock — the spin transition — drives both sampler and shift, so the
         // texture never drifts out of sync with the draw.
+        // The spin is an ABSOLUTE function of the frame-clock timestamp, not
+        // an accumulated animation: the native-tabbed iOS app overlaps two
+        // live canvases during a tab crossfade, and any per-canvas clock
+        // (wall-clock transitions pause differently, accumulators diverge by
+        // their pause histories) makes the two globes render a couple of
+        // degrees apart — the compositor blends them and the globe visibly
+        // shakes. Deriving the angle from the shared timestamp means every
+        // canvas draws the identical globe, so overlaps are invisible.
         val spinDeg: State<Float>? = if (flight == null) {
-            rememberInfiniteTransition(label = "globeSpin").animateFloat(
-                initialValue = 0f,
-                targetValue = 360f,
-                // 240 s per revolution = the reference's 1.5°/s idle drift.
-                animationSpec = infiniteRepeatable(tween(240_000, easing = LinearEasing)),
-                label = "spin",
-            )
+            val spin = remember { mutableStateOf(0f) }
+            LaunchedEffect(Unit) {
+                while (isActive) {
+                    withFrameNanos { now ->
+                        spin.value = ((now % SPIN_PERIOD_NS) * SPIN_DEG_PER_NS).toFloat()
+                    }
+                }
+            }
+            spin
         } else {
             null
         }
+        // Geometry is computed synchronously with the size it will be drawn
+        // at: the tabbed iOS host relays out the canvas several times while a
+        // tab animates in, and drawing against a stale async geometry made
+        // the globe visibly jump around until the producer caught up.
         val geometry = remember(flight?.id, widthPx, cropPx) {
-            mutableStateOf<GlobeGeometry?>(null)
+            buildGlobeGeometry(flight, route, widthPx, heightPx, 0f)
         }
-        val sphere = remember(flight?.id, widthPx, cropPx) {
+        // Keyed on the flight only, NOT the size: across a relayout the old
+        // raster keeps drawing (scaled) until the resized one is produced —
+        // for the idle globe both show the identical view, so the swap is
+        // invisible, whereas blanking it flashed on every tab switch.
+        val sphere = remember(flight?.id) {
             mutableStateOf<SphereFrame?>(null)
         }
         LaunchedEffect(flight?.id, widthPx, cropPx) {
@@ -369,10 +392,7 @@ fun SpaceBackdrop(
                 val outW = (widthPx.toInt().coerceAtLeast(1) + 1) / 2 +
                     (GLOBE_OVERSCAN_PX / 2).toInt()
                 val outH = (cropPx.toInt().coerceAtLeast(1) + 1) / 2
-                // Geometry (disk, route, atmosphere anchors) does not depend on
-                // the spin: only the sampled texture columns do.
-                val geo = buildGlobeGeometry(flight, route, widthPx, heightPx, 0f)
-                geometry.value = geo
+                val geo = geometry
                 val warp = buildGlobeWarp(
                     geo.view,
                     outW,
@@ -383,21 +403,26 @@ fun SpaceBackdrop(
                     xStartPx = -GLOBE_OVERSCAN_PX,
                 )
                 val buf = IntArray(outW * outH)
-                val bufferA = ImageBitmap(outW, outH)
-                val bufferB = ImageBitmap(outW, outH)
-                var front = bufferA
 
                 if (flight != null || spinDeg == null) {
                     // Route-framed view: static, sample once.
                     sampleGlobe(warp, earthTex.pixels, earthTex.width, geo.view.centerLonDeg, buf)
-                    front.writePixels(buf, outW, outH)
-                    sphere.value = SphereFrame(front, 0f)
+                    val bmp = ImageBitmap(outW, outH)
+                    bmp.writePixels(buf, outW, outH)
+                    sphere.value = SphereFrame(bmp, 0f)
                     return@withContext
                 }
 
+                var lastSpin = Float.NaN
                 while (isActive) {
                     val spinNow = spinDeg.value
-                    val back = if (front === bufferA) bufferB else bufferA
+                    if (spinNow == lastSpin) {
+                        // Hidden tab: rendering is paused, so the spin clock is
+                        // frozen — don't burn CPU resampling identical frames.
+                        delay(50.milliseconds)
+                        continue
+                    }
+                    lastSpin = spinNow
                     sampleGlobe(
                         warp,
                         earthTex.pixels,
@@ -405,9 +430,14 @@ fun SpaceBackdrop(
                         geo.view.centerLonDeg - spinNow,
                         buf,
                     )
-                    back.writePixels(buf, outW, outH)
-                    front = back
-                    sphere.value = SphereFrame(front, spinNow)
+                    // A FRESH bitmap per keyframe: the UI may still be drawing
+                    // the published one (render pipelines run frames behind on
+                    // slow hosts), and recycling buffers under it swaps the
+                    // pixels out from beneath the spin tag — the drift
+                    // compensation then mismatches and the globe rocks.
+                    val bmp = ImageBitmap(outW, outH)
+                    bmp.writePixels(buf, outW, outH)
+                    sphere.value = SphereFrame(bmp, spinNow)
                     delay(33.milliseconds)
                 }
             }
@@ -415,9 +445,9 @@ fun SpaceBackdrop(
 
         Canvas(modifier = Modifier.fillMaxWidth().height(cropDp)) {
             drawRect(FlightyColors.Space)
-            val geo = geometry.value
+            val geo = geometry
             val frame = sphere.value
-            if (geo != null && frame != null) {
+            if (frame != null) {
                 // Westward drift moves surface features rightward on screen at
                 // radius · dθ (equator rate); shift the keyframe by however far
                 // the spin has advanced since it was sampled.

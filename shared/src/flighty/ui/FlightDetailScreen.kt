@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,7 +39,7 @@ import flighty.ui.components.AirlineBadge
 import flighty.ui.components.AppIcons
 import flighty.ui.components.FlightProgressBar
 import flighty.ui.components.GateChip
-import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.imageResource
 import shared.generated.resources.Res
 import shared.generated.resources.plane_ac
 
@@ -280,21 +279,24 @@ private fun WheresMyPlaneCard(flight: Flight, note: String) {
                         color = Color.White.copy(alpha = 0.85f),
                     )
                 }
-                // The plane's box is sized explicitly from the header width at
-                // the asset's exact ratio (958x276 after trimming its
-                // transparent margins): neither the resource loader's intrinsic
-                // size nor aspect-ratio negotiation gets a say, so the photo
-                // can't render small or distorted.
-                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                    val planeWidth = maxWidth * 0.86f
+                // Sized by width fraction + the asset's exact ratio (958x276
+                // after trimming its transparent margins): no subcomposition,
+                // and neither the resource loader's intrinsic size nor
+                // aspect-ratio negotiation gets a say, so the photo can't
+                // render small or distorted.
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Image(
-                        painter = painterResource(Res.drawable.plane_ac),
+                        // Eagerly decoded bitmap (globally cached after the
+                        // first open): painterResource defers decode/upload to
+                        // first paint, which hitched the scroll right as this
+                        // card entered the viewport.
+                        bitmap = imageResource(Res.drawable.plane_ac),
                         contentDescription = flight.aircraft,
                         contentScale = ContentScale.FillBounds,
                         modifier = Modifier
-                            .align(Alignment.Center)
                             .padding(top = 28.dp)
-                            .size(width = planeWidth, height = planeWidth * (276f / 958f)),
+                            .fillMaxWidth(0.86f)
+                            .aspectRatio(958f / 276f),
                     )
                 }
             }
