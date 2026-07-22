@@ -23,7 +23,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberBottomSheetState
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import flighty.ui.components.FlightMenuAboveAnchor
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -161,7 +167,7 @@ private fun MapControlButton(icon: ImageVector, description: String) {
  * the bottom of the flight-detail sheet, standing in for the tab bar there.
  */
 @Composable
-fun DetailActionBar(modifier: Modifier = Modifier) {
+fun DetailActionBar(flight: Flight? = null, modifier: Modifier = Modifier) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier.fillMaxWidth()) {
         Surface(
             color = FlightyColors.CardBg,
@@ -174,7 +180,21 @@ fun DetailActionBar(modifier: Modifier = Modifier) {
             ) {
                 DetailActionIcon(AppIcons.Share, "Share")
                 DetailActionIcon(AppIcons.BellOff, "Alerts")
-                DetailActionIcon(AppIcons.More, "More")
+                Box {
+                    var menuOpen by remember { mutableStateOf(false) }
+                    DetailActionIcon(
+                        AppIcons.More,
+                        "More",
+                        onClick = if (flight != null) ({ menuOpen = true }) else null,
+                    )
+                    flight?.let {
+                        FlightMenuAboveAnchor(
+                            flight = it,
+                            expanded = menuOpen,
+                            onDismiss = { menuOpen = false },
+                        )
+                    }
+                }
             }
         }
         Spacer(Modifier.weight(1f))
@@ -195,11 +215,14 @@ fun DetailActionBar(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun DetailActionIcon(icon: ImageVector, description: String) {
+private fun DetailActionIcon(icon: ImageVector, description: String, onClick: (() -> Unit)? = null) {
     Icon(
         imageVector = icon,
         contentDescription = description,
         tint = FlightyColors.TextDark,
-        modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp).size(19.dp),
+        modifier = Modifier
+            .let { if (onClick != null) it.clickable(onClick = onClick) else it }
+            .padding(horizontal = 9.dp, vertical = 6.dp)
+            .size(19.dp),
     )
 }

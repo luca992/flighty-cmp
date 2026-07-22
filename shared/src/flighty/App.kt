@@ -112,6 +112,7 @@ fun App() {
                     )
                 } else {
                     DetailActionBar(
+                        flight = detailFlight,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .navigationBarsPadding()

@@ -74,6 +74,7 @@ fun FlightsFlow(
         bottomOverlay = {
             if (detailFlight != null && onDetailShown == null) {
                 DetailActionBar(
+                    flight = detailFlight,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
