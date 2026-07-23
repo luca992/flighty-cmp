@@ -100,25 +100,35 @@ internal fun globeViewFor(
     /** Sphere size basis: capped below [width] on wide hosts so the globe
      *  stops growing and outer space fills the margins instead. */
     globeWidth: Float = width,
+    /** Where the sheet's top edge sits, as a fraction of [height]. */
+    sheetTopFraction: Float = 0.34f,
 ): GlobeView {
     val radius = globeWidth * 0.80f
     val centerY = height * 0.055f + radius
     val (centerLon, centerLat) = if (flight != null) {
         val route = greatCircle(flight, samples = 16)
         val mid = route[route.size / 2]
-        // Look "below" the route by however many degrees put its midpoint at
-        // ~26% of the canvas height — above the sheet on every host shape.
-        // On phones this solves to the classic ~26°; on wide full-bleed
-        // hosts (huge sphere, sheet mid-window) it pushes the route up onto
-        // the visible crown instead of letting it dip behind the UI.
-        // Wide hosts (globe cap engaged) frame higher: the arc spans more
-        // screen width there, so its endpoints sag toward the sheet corners
-        // unless the midpoint sits closer to the crown.
-        val targetY = height * (if (globeWidth < width) 0.19f else 0.26f)
-        val sinOffset = ((centerY - targetY) / radius)
-            .coerceIn(0.1f, 0.95f)
-            .toDouble()
-        val offsetDeg = asin(sinOffset) * 180.0 / PI
+        val start = route.first()
+        val end = route.last()
+        // Start from the classic framing (route midpoint at ~26% of height),
+        // then keep looking further "below" the route until both endpoints —
+        // plus room for their airport chips — clear the sheet line. Endpoint
+        // sag grows with the canvas aspect, so a midpoint-only rule leaves
+        // chips tucked behind the sheet corners on anything wider than a
+        // phone; on phones the start value already passes and nothing moves.
+        var offsetDeg = asin(
+            ((centerY - height * 0.26f) / radius).coerceIn(0.1f, 0.95f).toDouble(),
+        ) * 180.0 / PI
+        val limitY = height * sheetTopFraction - height * 0.045f
+        while (offsetDeg < 80.0) {
+            val lat = (mid.second - offsetDeg).coerceIn(-60.0, 60.0)
+            val probe = GlobeView(width / 2f, centerY, radius, mid.first, lat)
+            val (_, y1, vis1) = probe.project(start.first, start.second)
+            val (_, y2, vis2) = probe.project(end.first, end.second)
+            val worst = maxOf(if (vis1) y1 else 0f, if (vis2) y2 else 0f)
+            if (worst <= limitY || lat <= -60.0) break
+            offsetDeg += 2.0
+        }
         mid.first to (mid.second - offsetDeg).coerceIn(-60.0, 60.0)
     } else {
         // North America + Atlantic + Europe across the top, drifting westward.
@@ -180,8 +190,11 @@ private fun buildGlobeGeometry(
     heightPx: Float,
     lonOffset: Float,
     globeWidthPx: Float = widthPx,
+    sheetTopFraction: Float = 0.34f,
 ): GlobeGeometry {
-    val view = globeViewFor(flight, widthPx, heightPx, lonOffset.toDouble(), globeWidthPx)
+    val view = globeViewFor(
+        flight, widthPx, heightPx, lonOffset.toDouble(), globeWidthPx, sheetTopFraction,
+    )
     val cx = view.centerX
     val cy = view.centerY
     val r = view.radius
@@ -399,7 +412,9 @@ fun SpaceBackdrop(
         // tab animates in, and drawing against a stale async geometry made
         // the globe visibly jump around until the producer caught up.
         val geometry = remember(flight?.id, widthPx, cropPx) {
-            buildGlobeGeometry(flight, route, widthPx, heightPx, 0f, globeWidthPx)
+            buildGlobeGeometry(
+                flight, route, widthPx, heightPx, 0f, globeWidthPx, mapHeightFraction,
+            )
         }
         // Keyed on the flight only, NOT the size: across a relayout the old
         // raster keeps drawing (scaled) until the resized one is produced —
@@ -497,7 +512,13 @@ fun SpaceBackdrop(
         // Airport chips, projected with the same (static, route-framed) view.
         if (flight != null) {
             val chipView = remember(flight.id, widthPx, heightPx) {
-                globeViewFor(flight, widthPx, heightPx, globeWidth = globeWidthPx)
+                globeViewFor(
+                    flight,
+                    widthPx,
+                    heightPx,
+                    globeWidth = globeWidthPx,
+                    sheetTopFraction = mapHeightFraction,
+                )
             }
             val (ox, oy, ov) = chipView.project(flight.origin.longitude, flight.origin.latitude)
             if (ov) {
