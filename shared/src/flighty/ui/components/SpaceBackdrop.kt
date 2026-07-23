@@ -428,11 +428,17 @@ fun SpaceBackdrop(
         val sphere = remember(flight?.id) {
             mutableStateOf<SphereFrame?>(null)
         }
+        // GPU path: per-pixel warp as a runtime shader, spin as a uniform.
+        // When present, the CPU keyframe producer below never starts.
+        val shaderRenderer = remember(earthImage) {
+            if (earthImage.width > 1) createGlobeShaderRenderer(earthImage) else null
+        }
         // earthTex is a key: on wasm imageResource resolves ASYNCHRONOUSLY,
         // and without it the producer keeps sampling the 1x1 placeholder
         // forever (the texture only appeared after a resize restarted the
         // effect via widthPx).
-        LaunchedEffect(flight?.id, widthPx, cropPx, earthTex) {
+        LaunchedEffect(flight?.id, widthPx, cropPx, earthTex, shaderRenderer) {
+            if (shaderRenderer != null) return@LaunchedEffect
             if (earthTex.width <= 1) return@LaunchedEffect   // placeholder
             withContext(Dispatchers.Default) {
                 // Overscan past the left canvas edge: the draw phase slides the
@@ -504,6 +510,18 @@ fun SpaceBackdrop(
         Canvas(modifier = Modifier.fillMaxWidth().height(cropDp)) {
             drawRect(FlightyColors.Space)
             val geo = geometry
+            if (shaderRenderer != null) {
+                val lon = geo.view.centerLonDeg - (spinDeg?.value ?: 0f)
+                val brush = shaderRenderer.brush(
+                    geo.view.centerX,
+                    geo.view.centerY,
+                    geo.view.radius,
+                    geo.view.centerLatDeg,
+                    lon,
+                )
+                drawGlobe(geo, stars, planePainter, sphereBrush = brush)
+                return@Canvas
+            }
             val frame = sphere.value
             if (frame != null) {
                 // Westward drift moves surface features rightward on screen at
@@ -563,6 +581,7 @@ private fun DrawScope.drawGlobe(
     planePainter: VectorPainter,
     sphere: ImageBitmap? = null,
     sphereShiftPx: Float = 0f,
+    sphereBrush: Brush? = null,
 ) {
     val cx = geo.view.centerX
     val cy = geo.view.centerY
@@ -594,7 +613,26 @@ private fun DrawScope.drawGlobe(
         center = Offset(cx, cy),
     )
 
-    if (sphere != null) {
+    if (sphereBrush != null) {
+        // GPU: the runtime shader evaluates the warp per pixel; the limb
+        // shading matches the CPU path's.
+        clipPath(geo.disk) {
+            drawPath(geo.disk, sphereBrush)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colorStops = arrayOf(
+                        0.0f to Color.Transparent,
+                        0.72f to Color.Transparent,
+                        1.0f to Color(0xB3040A18),
+                    ),
+                    center = Offset(cx, cy - r * 0.55f),
+                    radius = r * 1.65f,
+                ),
+                radius = r,
+                center = Offset(cx, cy),
+            )
+        }
+    } else if (sphere != null) {
         // Real earth imagery, warped onto the sphere. The disk clip keeps the
         // circular edge crisp despite the half-resolution upscale, and a limb
         // shading pass restores the sphere's depth over the flat texture.
