@@ -423,7 +423,12 @@ fun SpaceBackdrop(
         val sphere = remember(flight?.id) {
             mutableStateOf<SphereFrame?>(null)
         }
-        LaunchedEffect(flight?.id, widthPx, cropPx) {
+        // earthTex is a key: on wasm imageResource resolves ASYNCHRONOUSLY,
+        // and without it the producer keeps sampling the 1x1 placeholder
+        // forever (the texture only appeared after a resize restarted the
+        // effect via widthPx).
+        LaunchedEffect(flight?.id, widthPx, cropPx, earthTex) {
+            if (earthTex.width <= 1) return@LaunchedEffect   // placeholder
             withContext(Dispatchers.Default) {
                 // Overscan past the left canvas edge: the draw phase slides the
                 // raster rightward to carry motion between keyframes, and
@@ -483,7 +488,12 @@ fun SpaceBackdrop(
                     val bmp = ImageBitmap(outW, outH)
                     bmp.writePixels(buf, outW, outH)
                     sphere.value = SphereFrame(bmp, spinNow)
-                    delay(33.milliseconds)
+                    // 15 Hz keyframes: the draw-phase slide carries motion at
+                    // display rate between them, so cadence only bounds the
+                    // texture-content lag (0.1°, slide-corrected). Halving it
+                    // matters most on wasm, where Dispatchers.Default IS the
+                    // UI thread and every keyframe costs main-thread time.
+                    delay(66.milliseconds)
                 }
             }
         }
