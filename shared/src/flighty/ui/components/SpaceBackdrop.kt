@@ -492,12 +492,11 @@ fun SpaceBackdrop(
                         geo.view.centerLonDeg - spinNow,
                     )
                     sphere.value = SphereFrame(bmp, spinNow, pxPerDeg)
-                    // 15 Hz keyframes: the draw-phase slide carries motion at
-                    // display rate between them, so cadence only bounds the
-                    // texture-content lag (0.1°, slide-corrected). Halving it
-                    // matters most on wasm, where Dispatchers.Default IS the
-                    // UI thread and every keyframe costs main-thread time.
-                    delay(66.milliseconds)
+                    // 30 Hz keyframes; the draw-phase slide carries motion at
+                    // display rate between them. Direct-BGRA sampling keeps
+                    // this affordable even on wasm, where Dispatchers.Default
+                    // IS the UI thread.
+                    delay(33.milliseconds)
                 }
             }
         }
