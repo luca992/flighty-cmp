@@ -23,6 +23,15 @@ internal class GlobeWarp(
     val rowBase: IntArray,
     /** Texture column for the pixel's longitude relative to the view center. */
     val relCol: IntArray,
+    /**
+     * Mean of cos(lat)·cos(relLon) over the visible pixels: the band's true
+     * average horizontal motion per degree of spin, as a fraction of the
+     * equator rate. The draw-phase slide must use this — sliding at the
+     * equator rate over-shoots the crown-heavy band and every keyframe swap
+     * snaps the excess back, which reads as the texture shaking (worst on
+     * big globes at low keyframe cadence).
+     */
+    val dxFactor: Float,
 )
 
 /**
@@ -49,6 +58,7 @@ internal fun buildGlobeWarp(
     val diskIndex = ArrayList<Int>(outW * outH / 2)
     val rowBase = ArrayList<Int>(outW * outH / 2)
     val relCol = ArrayList<Int>(outW * outH / 2)
+    var dxSum = 0.0
 
     for (py in 0 until outH) {
         val fy = (py + 0.5f) * scale
@@ -68,6 +78,7 @@ internal fun buildGlobeWarp(
             diskIndex.add(py * outW + px)
             rowBase.add(row * texW)
             relCol.add(col)
+            dxSum += cos(phi) * cos(relLam)
         }
     }
     return GlobeWarp(
@@ -76,6 +87,7 @@ internal fun buildGlobeWarp(
         diskIndex = diskIndex.toIntArray(),
         rowBase = rowBase.toIntArray(),
         relCol = relCol.toIntArray(),
+        dxFactor = (dxSum / diskIndex.size.coerceAtLeast(1)).toFloat(),
     )
 }
 

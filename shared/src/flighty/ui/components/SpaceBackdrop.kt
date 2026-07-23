@@ -169,7 +169,12 @@ private class GlobeGeometry(
 private class EarthTexture(val pixels: IntArray, val width: Int, val height: Int)
 
 /** A produced sphere raster tagged with the spin angle it was sampled at. */
-private class SphereFrame(val bitmap: ImageBitmap, val spinDeg: Float)
+private class SphereFrame(
+    val bitmap: ImageBitmap,
+    val spinDeg: Float,
+    /** Screen px the raster slides per degree of further spin. */
+    val pxPerDeg: Float,
+)
 
 /**
  * Extra sampled margin (screen px) left of the canvas; see the producer.
@@ -456,6 +461,7 @@ fun SpaceBackdrop(
                 // Skiko: direct BGRA bytes). produce() returns a fresh bitmap
                 // per keyframe — see SphereSurface.
                 val surface = createSphereSurface(outW, outH)
+                val pxPerDeg = geo.view.radius * (PI.toFloat() / 180f) * warp.dxFactor
 
                 if (flight != null || spinDeg == null) {
                     // Route-framed view: static, sample once.
@@ -464,6 +470,7 @@ fun SpaceBackdrop(
                             warp, earthTex.pixels, earthTex.width, geo.view.centerLonDeg,
                         ),
                         0f,
+                        pxPerDeg,
                     )
                     return@withContext
                 }
@@ -484,7 +491,7 @@ fun SpaceBackdrop(
                         earthTex.width,
                         geo.view.centerLonDeg - spinNow,
                     )
-                    sphere.value = SphereFrame(bmp, spinNow)
+                    sphere.value = SphereFrame(bmp, spinNow, pxPerDeg)
                     // 15 Hz keyframes: the draw-phase slide carries motion at
                     // display rate between them, so cadence only bounds the
                     // texture-content lag (0.1°, slide-corrected). Halving it
@@ -507,10 +514,10 @@ fun SpaceBackdrop(
                 if (spinDeg != null) {
                     var d = spinDeg.value - frame.spinDeg
                     if (d < -180f) d += 360f
-                    // Never slide past the sampled overscan margin, even if the
+                    // Slide at the band's measured mean rate (see dxFactor) and
+                    // never past the sampled overscan margin, even if the
                     // producer stalls for a while.
-                    shift = (d * geo.view.radius * (PI.toFloat() / 180f))
-                        .coerceIn(0f, GLOBE_OVERSCAN_PX)
+                    shift = (d * frame.pxPerDeg).coerceIn(0f, GLOBE_OVERSCAN_PX)
                 }
                 drawGlobe(geo, stars, planePainter, frame.bitmap, shift)
             }
