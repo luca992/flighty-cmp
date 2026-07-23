@@ -8,6 +8,10 @@ Inspired by [this demo](https://x.com/nater02/status/2079180521427308791) of Fli
 Expo — this is the Kotlin Multiplatform take on the same idea, styled after the real app: a dark
 earth-from-space map backdrop with a light sheet floating over it.
 
+**Try it live:** [luca992.github.io/flighty-cmp](https://luca992.github.io/flighty-cmp/) — the
+web (Kotlin/Wasm) build, served straight from this repo's [`docs/`](docs) folder via GitHub Pages
+(`scripts/publish-web.sh` regenerates it).
+
 ## Demo
 
 [![Four-platform walkthrough](demo-captures/composite.gif)](demo-captures/composite.mp4)
