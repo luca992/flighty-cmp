@@ -53,6 +53,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlin.math.PI
+import kotlin.math.asin
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
@@ -96,20 +97,36 @@ internal fun globeViewFor(
     width: Float,
     height: Float,
     lonOffset: Double = 0.0,
+    /** Sphere size basis: capped below [width] on wide hosts so the globe
+     *  stops growing and outer space fills the margins instead. */
+    globeWidth: Float = width,
 ): GlobeView {
+    val radius = globeWidth * 0.80f
+    val centerY = height * 0.055f + radius
     val (centerLon, centerLat) = if (flight != null) {
         val route = greatCircle(flight, samples = 16)
         val mid = route[route.size / 2]
-        // Look "below" the route so it lands in the visible upper part of the sphere.
-        mid.first to (mid.second - 26.0).coerceIn(-60.0, 60.0)
+        // Look "below" the route by however many degrees put its midpoint at
+        // ~26% of the canvas height — above the sheet on every host shape.
+        // On phones this solves to the classic ~26°; on wide full-bleed
+        // hosts (huge sphere, sheet mid-window) it pushes the route up onto
+        // the visible crown instead of letting it dip behind the UI.
+        // Wide hosts (globe cap engaged) frame higher: the arc spans more
+        // screen width there, so its endpoints sag toward the sheet corners
+        // unless the midpoint sits closer to the crown.
+        val targetY = height * (if (globeWidth < width) 0.19f else 0.26f)
+        val sinOffset = ((centerY - targetY) / radius)
+            .coerceIn(0.1f, 0.95f)
+            .toDouble()
+        val offsetDeg = asin(sinOffset) * 180.0 / PI
+        mid.first to (mid.second - offsetDeg).coerceIn(-60.0, 60.0)
     } else {
         // North America + Atlantic + Europe across the top, drifting westward.
         (-50.0 - lonOffset) to 22.0
     }
-    val radius = width * 0.80f
     return GlobeView(
         centerX = width / 2f,
-        centerY = height * 0.055f + radius,
+        centerY = centerY,
         radius = radius,
         centerLonDeg = centerLon,
         centerLatDeg = centerLat,
@@ -162,8 +179,9 @@ private fun buildGlobeGeometry(
     widthPx: Float,
     heightPx: Float,
     lonOffset: Float,
+    globeWidthPx: Float = widthPx,
 ): GlobeGeometry {
-    val view = globeViewFor(flight, widthPx, heightPx, lonOffset.toDouble())
+    val view = globeViewFor(flight, widthPx, heightPx, lonOffset.toDouble(), globeWidthPx)
     val cx = view.centerX
     val cy = view.centerY
     val r = view.radius
@@ -303,6 +321,9 @@ fun SpaceBackdrop(
         // visible world instead — the giant disk extends well below the band,
         // and a truncated texture there reads as a bug.
         val fullBleed = maxWidth > PhoneMaxWidth + 40.dp
+        // The sphere stops growing past this width — beyond it, the margins
+        // are space, not ever-more-gigantic planet.
+        val globeWidthPx = minOf(widthPx, with(density) { 900.dp.toPx() })
         val cropFraction = (mapHeightFraction + 0.20f).coerceAtMost(0.60f)
         val cropDp = if (fullBleed) maxHeight else maxHeight * cropFraction
         val cropPx = with(density) { cropDp.toPx() }
@@ -378,7 +399,7 @@ fun SpaceBackdrop(
         // tab animates in, and drawing against a stale async geometry made
         // the globe visibly jump around until the producer caught up.
         val geometry = remember(flight?.id, widthPx, cropPx) {
-            buildGlobeGeometry(flight, route, widthPx, heightPx, 0f)
+            buildGlobeGeometry(flight, route, widthPx, heightPx, 0f, globeWidthPx)
         }
         // Keyed on the flight only, NOT the size: across a relayout the old
         // raster keeps drawing (scaled) until the resized one is produced —
@@ -476,7 +497,7 @@ fun SpaceBackdrop(
         // Airport chips, projected with the same (static, route-framed) view.
         if (flight != null) {
             val chipView = remember(flight.id, widthPx, heightPx) {
-                globeViewFor(flight, widthPx, heightPx)
+                globeViewFor(flight, widthPx, heightPx, globeWidth = globeWidthPx)
             }
             val (ox, oy, ov) = chipView.project(flight.origin.longitude, flight.origin.latitude)
             if (ov) {
