@@ -1,0 +1,11 @@
+product: wasm-js/app
+
+dependencies:
+  - ../shared
+
+settings:
+  kotlin:
+    version: 2.4.0
+  compose:
+    enabled: true
+    version: 1.12.0-beta02

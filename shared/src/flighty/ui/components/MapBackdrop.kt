@@ -8,7 +8,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import flighty.model.Flight
-import flighty.platformName
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -25,7 +24,7 @@ fun MapBackdrop(
     mapHeightFraction: Float,
     modifier: Modifier = Modifier,
 ) {
-    if (detail && flight != null && platformName() != "Desktop JVM") {
+    if (detail && flight != null && hasNativeRouteMap) {
         // The native map view only mounts once the detail entrance animation
         // has settled: its surface creation and style load land on the UI
         // thread, and mounting mid-transition visibly janks the slide-in
@@ -36,7 +35,7 @@ fun MapBackdrop(
             mountMap = true
         }
         if (mountMap) {
-            MaplibreRouteMap(flight, mapHeightFraction, modifier)
+            NativeRouteMap(flight, mapHeightFraction, modifier)
         } else {
             SpaceBackdrop(flight, mapHeightFraction, modifier)
         }

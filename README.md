@@ -1,7 +1,7 @@
 # Flighty KMP
 
 A [Flighty](https://flighty.com)-style flight tracker built with **Compose Multiplatform**, targeting
-**Android**, **iOS**, and **desktop (JVM)** from a single codebase. All data is mocked — a frozen
+**Android**, **iOS**, **desktop (JVM)**, and the **web (Kotlin/Wasm)** from a single codebase. All data is mocked — a frozen
 snapshot of "Mon, Jul 20" with one flight mid-air.
 
 Inspired by [this demo](https://x.com/nater02/status/2079180521427308791) of Flighty rebuilt with
@@ -54,6 +54,7 @@ shared/                  kmp/lib — Compose UI, depends on core
 android-app/             android/app — MainActivity calling App()
 ios-app/                 ios/app — ComposeUIViewController + SwiftUI host (Xcode project included)
 jvm-app/                 jvm/app — desktop window, handy for quick iteration
+web-app/                 wasm-js/app — ComposeViewport entry + index.html
 ```
 
 Rules of the shape: UI depends on `core`, never the reverse; `core` has no
@@ -80,6 +81,7 @@ Kotlin/Native, xcodebuild glue).
 ./kotlin run --module android-app                    # Android emulator/device
 ./kotlin run --module ios-app \
   --platform=iosSimulatorArm64 --device-id=<UDID>    # iOS simulator
+scripts/serve-web.sh                                 # web (wasm) at localhost:8080
 ```
 
 You can also open `ios-app/module.xcodeproj` in Xcode.
@@ -109,7 +111,7 @@ Two backdrops, matching the real Flighty:
   [MapLibre Compose](https://maplibre.org/maplibre-compose/) vector map
   (`org.maplibre.compose:maplibre-compose:0.13.0`, OpenFreeMap `dark` style, no API key) with the
   great-circle route, endpoints, and plane position as GeoJSON layers.
-- **Tabs & desktop**: an orthographic **globe** drawn in commonMain — real Natural Earth
+- **Tabs, desktop & web**: an orthographic **globe** drawn in commonMain — real Natural Earth
   coastlines projected onto a sphere with atmosphere glow, graticule, city lights, and the live
   route arcing over it. (MapLibre Compose's desktop backend is ~15% complete, hence the fallback;
   mobile MapLibre has no globe projection yet, hence the canvas globe for the hero screens.)

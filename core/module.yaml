@@ -2,7 +2,7 @@
 # (shared) consumes this; nothing here may depend on Compose.
 product:
   type: kmp/lib
-  platforms: [jvm, android, iosArm64, iosSimulatorArm64]
+  platforms: [jvm, android, iosArm64, iosSimulatorArm64, wasmJs]
 
 dependencies:
   - org.jetbrains.androidx.lifecycle:lifecycle-viewmodel:2.11.0: exported

@@ -1,6 +1,9 @@
 product:
   type: kmp/lib
-  platforms: [jvm, android, iosArm64, iosSimulatorArm64]
+  platforms: [jvm, android, iosArm64, iosSimulatorArm64, wasmJs]
+
+aliases:
+  - maplibre: [android, iosArm64, iosSimulatorArm64]
 
 dependencies:
   - ../core: exported
@@ -8,6 +11,8 @@ dependencies:
   - org.jetbrains.compose.material3:material3:1.12.0-alpha03: exported
   - org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0
   - org.jetbrains.androidx.navigation3:navigation3-ui:1.1.1
+
+dependencies@maplibre:
   - org.maplibre.compose:maplibre-compose:0.13.0
 
 settings:

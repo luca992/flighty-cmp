@@ -5,3 +5,4 @@ modules:
   - ios-app-glass
   - jvm-app
   - shared
+  - web-app
