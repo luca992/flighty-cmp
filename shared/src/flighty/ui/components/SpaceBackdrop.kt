@@ -298,8 +298,13 @@ fun SpaceBackdrop(
         // The sheet permanently covers everything below its peek position, so
         // only rasterize (and composite) the visible map band — roughly halves
         // the bitmap that gets drawn every frame.
+        // Phones raster only the band the sheet won't cover; hosts wider than
+        // the phone column (web/tablet full-bleed backdrop) render the whole
+        // visible world instead — the giant disk extends well below the band,
+        // and a truncated texture there reads as a bug.
+        val fullBleed = maxWidth > PhoneMaxWidth + 40.dp
         val cropFraction = (mapHeightFraction + 0.20f).coerceAtMost(0.60f)
-        val cropDp = maxHeight * cropFraction
+        val cropDp = if (fullBleed) maxHeight else maxHeight * cropFraction
         val cropPx = with(density) { cropDp.toPx() }
 
         val route = remember(flight?.id) { flight?.let { greatCircle(it) } }
@@ -389,15 +394,19 @@ fun SpaceBackdrop(
                 // without spare texture there the shift would expose a
                 // flickering unsampled sliver. GLOBE_OVERSCAN_PX of margin
                 // covers shifts from keyframe delays of several frames.
-                val outW = (widthPx.toInt().coerceAtLeast(1) + 1) / 2 +
-                    (GLOBE_OVERSCAN_PX / 2).toInt()
-                val outH = (cropPx.toInt().coerceAtLeast(1) + 1) / 2
+                // Half-res on phones; wider canvases (web/tablet full-bleed)
+                // cap the raster so per-keyframe sampling cost stays flat —
+                // beyond ~800 columns the 2048px source texture is the
+                // resolution limit anyway, the blit upscales the rest.
+                val scale = maxOf(2f, widthPx / 800f)
+                val outW = ((widthPx + GLOBE_OVERSCAN_PX) / scale).toInt().coerceAtLeast(1)
+                val outH = (cropPx / scale).toInt().coerceAtLeast(1)
                 val geo = geometry
                 val warp = buildGlobeWarp(
                     geo.view,
                     outW,
                     outH,
-                    2f,
+                    scale,
                     earthTex.width,
                     earthTex.height,
                     xStartPx = -GLOBE_OVERSCAN_PX,

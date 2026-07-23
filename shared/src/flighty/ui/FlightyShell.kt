@@ -8,12 +8,14 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,6 +43,7 @@ import flighty.model.Flight
 import flighty.platformName
 import flighty.ui.components.AppIcons
 import flighty.ui.components.MapBackdrop
+import flighty.ui.components.PhoneMaxWidth
 
 /**
  * The Flighty look shared by every host: map/globe backdrop, floating map
@@ -71,6 +74,16 @@ fun FlightyShell(
             detail = detail,
             mapHeightFraction = if (detail) 0.45f else 0.34f,
         )
+
+        // Everything except the backdrop is phone-designed: on wide hosts
+        // (web, tablets, big desktop windows) it lives in a centered
+        // phone-width column while the map/globe keeps bleeding edge to edge.
+        Box(
+            modifier = Modifier
+                .widthIn(max = PhoneMaxWidth)
+                .fillMaxHeight()
+                .align(Alignment.TopCenter),
+        ) {
 
         // Flighty's map controls sit over the backdrop but under the sheet:
         // they must disappear behind it as the sheet expands.
@@ -129,6 +142,7 @@ fun FlightyShell(
         ) { /* Map area — the backdrop behind the scaffold shows through. */ }
 
         bottomOverlay()
+        }
     }
 }
 

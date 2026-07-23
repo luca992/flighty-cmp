@@ -43,6 +43,7 @@ import flighty.data.AppGraph
 import flighty.model.AddFlightShortcut
 import flighty.model.AddFlightSuggestion
 import flighty.ui.components.AppIcons
+import flighty.ui.components.PhoneMaxWidth
 import flighty.vm.AddFlightViewModel
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
@@ -61,6 +62,7 @@ fun AddFlightSheetHost(onDismiss: () -> Unit) {
     val state by addFlightViewModel.uiState.collectAsState()
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetMaxWidth = PhoneMaxWidth,
         // Flighty's search opens straight to a full-height sheet — no
         // partial stop, so the enabled values skip PartiallyExpanded.
         sheetState = rememberBottomSheetState(
