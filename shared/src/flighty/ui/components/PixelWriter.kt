@@ -3,8 +3,17 @@ package flighty.ui.components
 import androidx.compose.ui.graphics.ImageBitmap
 
 /**
- * Writes ARGB pixels into an [ImageBitmap] in place. Compose's common API can
- * read pixels ([androidx.compose.ui.graphics.toPixelMap]) but not write them,
- * so the textured globe's warp buffer needs this tiny platform hook.
+ * Per-platform sphere-raster transport, each target on its fastest path:
+ * Android samples ARGB ints straight into Bitmap.setPixels; Skiko targets
+ * (desktop, iOS, web) sample straight into the BGRA byte layout that
+ * installPixels wants, skipping a per-keyframe conversion pass.
+ *
+ * [produce] returns a FRESH bitmap each call: the UI may still be drawing
+ * the previously published one frames later, and recycling buffers under it
+ * desynchronizes the drift compensation (the globe visibly rocks).
  */
-internal expect fun ImageBitmap.writePixels(pixels: IntArray, width: Int, height: Int)
+internal interface SphereSurface {
+    fun produce(warp: GlobeWarp, tex: IntArray, texW: Int, centerLonDeg: Double): ImageBitmap
+}
+
+internal expect fun createSphereSurface(width: Int, height: Int): SphereSurface

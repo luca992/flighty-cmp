@@ -124,3 +124,57 @@ internal fun sampleGlobe(
         out[diskIndex[i]] = ag or rb
     }
 }
+
+/**
+ * Same warp sampling as [sampleGlobe], but written straight into a BGRA byte
+ * buffer — the layout Skia's installPixels wants — so Skiko targets skip a
+ * whole ARGB-int-to-byte conversion pass per keyframe. Non-disk bytes stay
+ * zero (transparent); only visible sphere pixels are ever touched.
+ */
+internal fun sampleGlobeBgra(
+    warp: GlobeWarp,
+    tex: IntArray,
+    texW: Int,
+    centerLonDeg: Double,
+    out: ByteArray,
+) {
+    var shiftF = (centerLonDeg / 360.0) * texW % texW
+    if (shiftF < 0) shiftF += texW
+    val shift = shiftF.toInt()
+    val w1 = ((shiftF - shift) * 256).toInt()
+    val w0 = 256 - w1
+    val diskIndex = warp.diskIndex
+    val rowBase = warp.rowBase
+    val relCol = warp.relCol
+    if (w1 == 0) {
+        for (i in diskIndex.indices) {
+            var col = relCol[i] + shift
+            if (col >= texW) col -= texW
+            val c = tex[rowBase[i] + col]
+            val j = diskIndex[i] * 4
+            out[j] = (c and 0xFF).toByte()
+            out[j + 1] = (c shr 8 and 0xFF).toByte()
+            out[j + 2] = (c shr 16 and 0xFF).toByte()
+            out[j + 3] = (c shr 24 and 0xFF).toByte()
+        }
+        return
+    }
+    for (i in diskIndex.indices) {
+        var col = relCol[i] + shift
+        if (col >= texW) col -= texW
+        var col2 = col + 1
+        if (col2 >= texW) col2 -= texW
+        val base = rowBase[i]
+        val c0 = tex[base + col]
+        val c1 = tex[base + col2]
+        val rb = ((c0 and 0x00FF00FF) * w0 + (c1 and 0x00FF00FF) * w1) shr 8 and 0x00FF00FF
+        val ag = ((c0 ushr 8 and 0x00FF00FF) * w0 + (c1 ushr 8 and 0x00FF00FF) * w1) and
+            0xFF00FF00.toInt()
+        val c = ag or rb
+        val j = diskIndex[i] * 4
+        out[j] = (c and 0xFF).toByte()
+        out[j + 1] = (c shr 8 and 0xFF).toByte()
+        out[j + 2] = (c shr 16 and 0xFF).toByte()
+        out[j + 3] = (c shr 24 and 0xFF).toByte()
+    }
+}

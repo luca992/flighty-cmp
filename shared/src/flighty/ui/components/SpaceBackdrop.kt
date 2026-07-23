@@ -452,14 +452,19 @@ fun SpaceBackdrop(
                     earthTex.height,
                     xStartPx = -GLOBE_OVERSCAN_PX,
                 )
-                val buf = IntArray(outW * outH)
+                // Each platform's fastest pixel path (Android: int setPixels;
+                // Skiko: direct BGRA bytes). produce() returns a fresh bitmap
+                // per keyframe — see SphereSurface.
+                val surface = createSphereSurface(outW, outH)
 
                 if (flight != null || spinDeg == null) {
                     // Route-framed view: static, sample once.
-                    sampleGlobe(warp, earthTex.pixels, earthTex.width, geo.view.centerLonDeg, buf)
-                    val bmp = ImageBitmap(outW, outH)
-                    bmp.writePixels(buf, outW, outH)
-                    sphere.value = SphereFrame(bmp, 0f)
+                    sphere.value = SphereFrame(
+                        surface.produce(
+                            warp, earthTex.pixels, earthTex.width, geo.view.centerLonDeg,
+                        ),
+                        0f,
+                    )
                     return@withContext
                 }
 
@@ -473,20 +478,12 @@ fun SpaceBackdrop(
                         continue
                     }
                     lastSpin = spinNow
-                    sampleGlobe(
+                    val bmp = surface.produce(
                         warp,
                         earthTex.pixels,
                         earthTex.width,
                         geo.view.centerLonDeg - spinNow,
-                        buf,
                     )
-                    // A FRESH bitmap per keyframe: the UI may still be drawing
-                    // the published one (render pipelines run frames behind on
-                    // slow hosts), and recycling buffers under it swaps the
-                    // pixels out from beneath the spin tag — the drift
-                    // compensation then mismatches and the globe rocks.
-                    val bmp = ImageBitmap(outW, outH)
-                    bmp.writePixels(buf, outW, outH)
                     sphere.value = SphereFrame(bmp, spinNow)
                     // 15 Hz keyframes: the draw-phase slide carries motion at
                     // display rate between them, so cadence only bounds the
