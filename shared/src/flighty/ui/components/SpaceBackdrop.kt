@@ -366,9 +366,15 @@ fun SpaceBackdrop(
         val planePainter = rememberVectorPainter(AppIcons.Plane)
 
         // NASA Blue Marble (public domain), pre-darkened for the space look.
-        // Copied once into a tight IntArray for the warp sampler.
         val earthImage = imageResource(Res.drawable.earth_tex)
-        val earthTex = remember(earthImage) {
+        // GPU path: per-pixel warp as a runtime shader, spin as a uniform.
+        val shaderRenderer = remember(earthImage) {
+            if (earthImage.width > 1) createGlobeShaderRenderer(earthImage) else null
+        }
+        // CPU fallback only: the IntArray copy is ~w*h*4 bytes (33 MB at 4K),
+        // so it is never built on hosts the shader serves.
+        val earthTex = remember(earthImage, shaderRenderer) {
+            if (shaderRenderer != null || earthImage.width <= 1) return@remember null
             val map = earthImage.toPixelMap()
             val w = map.width
             val h = map.height
@@ -428,18 +434,13 @@ fun SpaceBackdrop(
         val sphere = remember(flight?.id) {
             mutableStateOf<SphereFrame?>(null)
         }
-        // GPU path: per-pixel warp as a runtime shader, spin as a uniform.
-        // When present, the CPU keyframe producer below never starts.
-        val shaderRenderer = remember(earthImage) {
-            if (earthImage.width > 1) createGlobeShaderRenderer(earthImage) else null
-        }
         // earthTex is a key: on wasm imageResource resolves ASYNCHRONOUSLY,
         // and without it the producer keeps sampling the 1x1 placeholder
         // forever (the texture only appeared after a resize restarted the
         // effect via widthPx).
         LaunchedEffect(flight?.id, widthPx, cropPx, earthTex, shaderRenderer) {
             if (shaderRenderer != null) return@LaunchedEffect
-            if (earthTex.width <= 1) return@LaunchedEffect   // placeholder
+            if (earthTex == null) return@LaunchedEffect   // shader path or placeholder
             withContext(Dispatchers.Default) {
                 // Overscan past the left canvas edge: the draw phase slides the
                 // raster rightward to carry motion between keyframes, and
