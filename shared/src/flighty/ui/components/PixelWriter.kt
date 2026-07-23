@@ -13,7 +13,21 @@ import androidx.compose.ui.graphics.ImageBitmap
  * desynchronizes the drift compensation (the globe visibly rocks).
  */
 internal interface SphereSurface {
-    fun produce(warp: GlobeWarp, tex: IntArray, texW: Int, centerLonDeg: Double): ImageBitmap
+    /**
+     * Suspends between sampling chunks (cooperative yield): on wasm the
+     * producer shares the UI thread, and one monolithic sampling task lands
+     * as a long task that overruns frame deadlines — chunking lets the
+     * browser paint between slices. On real threads the yields are ~free.
+     */
+    suspend fun produce(
+        warp: GlobeWarp,
+        tex: IntArray,
+        texW: Int,
+        centerLonDeg: Double,
+    ): ImageBitmap
 }
+
+/** Sampling slice size: ~5 slices for a phone-band raster. */
+internal const val SPHERE_CHUNK = 60_000
 
 internal expect fun createSphereSurface(width: Int, height: Int): SphereSurface

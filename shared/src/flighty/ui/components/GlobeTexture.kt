@@ -98,6 +98,8 @@ internal fun sampleGlobe(
     texW: Int,
     centerLonDeg: Double,
     out: IntArray,
+    from: Int = 0,
+    until: Int = warp.diskIndex.size,
 ) {
     // The view centers on centerLonDeg, and relCol already encodes +180°/2
     // (texture column 0 is longitude -180°). The shift is fractional: at this
@@ -115,14 +117,14 @@ internal fun sampleGlobe(
     val rowBase = warp.rowBase
     val relCol = warp.relCol
     if (w1 == 0) {
-        for (i in diskIndex.indices) {
+        for (i in from until until) {
             var col = relCol[i] + shift
             if (col >= texW) col -= texW
             out[diskIndex[i]] = tex[rowBase[i] + col]
         }
         return
     }
-    for (i in diskIndex.indices) {
+    for (i in from until until) {
         var col = relCol[i] + shift
         if (col >= texW) col -= texW
         var col2 = col + 1
@@ -149,6 +151,8 @@ internal fun sampleGlobeBgra(
     texW: Int,
     centerLonDeg: Double,
     out: ByteArray,
+    from: Int = 0,
+    until: Int = warp.diskIndex.size,
 ) {
     var shiftF = (centerLonDeg / 360.0) * texW % texW
     if (shiftF < 0) shiftF += texW
@@ -159,7 +163,7 @@ internal fun sampleGlobeBgra(
     val rowBase = warp.rowBase
     val relCol = warp.relCol
     if (w1 == 0) {
-        for (i in diskIndex.indices) {
+        for (i in from until until) {
             var col = relCol[i] + shift
             if (col >= texW) col -= texW
             val c = tex[rowBase[i] + col]
@@ -171,7 +175,7 @@ internal fun sampleGlobeBgra(
         }
         return
     }
-    for (i in diskIndex.indices) {
+    for (i in from until until) {
         var col = relCol[i] + shift
         if (col >= texW) col -= texW
         var col2 = col + 1
